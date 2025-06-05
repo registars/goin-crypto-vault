@@ -1,6 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
-import { Play, Pause, Zap, Coins, TrendingUp, Award, Clock, Eye, Gift, Wallet, Key, Download, Upload, Copy, Shield, RefreshCw } from 'lucide-react';
+import { Play, Pause, Zap, Coins, TrendingUp, Award, Clock, Eye, Gift, Wallet, Key, Download, Upload, Copy, Shield, RefreshCw, Send, Users, Trophy, Link, Star } from 'lucide-react';
+import { useToast } from "@/hooks/use-toast";
+
+// GOIN Token Contract Address on Testnet
+const GOIN_CONTRACT_ADDRESS = '0xf202f380d4e244d2b1b0c6f3de346a1ce154cc7a';
+const BSC_TESTNET_RPC = 'https://data-seed-prebsc-1-s1.binance.org:8545/';
 
 const CryptoMiningApp = () => {
   const [isMining, setIsMining] = useState(false);
@@ -21,6 +25,17 @@ const CryptoMiningApp = () => {
   const [dailyBonus, setDailyBonus] = useState(true);
   const [achievements, setAchievements] = useState([]);
 
+  // New state variables for additional features
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [referralCode, setReferralCode] = useState('');
+  const [referrals, setReferrals] = useState([]);
+  const [leaderboard, setLeaderboard] = useState([]);
+  const [userReferralCode, setUserReferralCode] = useState('');
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [showReferralModal, setShowReferralModal] = useState(false);
+
+  const { toast } = useToast();
+
   // Wallet Generation (BEP20 compatible)
   const generateWallet = () => {
     // Simulasi generate wallet BEP20
@@ -31,13 +46,18 @@ const CryptoMiningApp = () => {
       address: publicKey,
       privateKey: privateKey,
       mnemonic: generateMnemonic(),
-      network: 'BSC Mainnet',
+      network: 'BSC Testnet',
+      contractAddress: GOIN_CONTRACT_ADDRESS,
       created: new Date().toISOString()
     };
     
     setWallet(newWallet);
     setWalletBalance(0);
-    alert('Wallet GOIN berhasil dibuat!\nNetwork: Binance Smart Chain (BEP20)');
+    generateUserReferralCode();
+    toast({
+      title: "Wallet Created!",
+      description: "GOIN wallet on BSC Testnet created successfully",
+    });
   };
 
   const generateMnemonic = () => {
@@ -47,7 +67,11 @@ const CryptoMiningApp = () => {
 
   const importWallet = () => {
     if (!importKey.trim()) {
-      alert('Masukkan Private Key atau Mnemonic Phrase');
+      toast({
+        title: "Error",
+        description: "Please enter Private Key or Mnemonic Phrase",
+        variant: "destructive",
+      });
       return;
     }
     
@@ -58,7 +82,8 @@ const CryptoMiningApp = () => {
         address: publicKey,
         privateKey: importKey,
         mnemonic: generateMnemonic(),
-        network: 'BSC Mainnet',
+        network: 'BSC Testnet',
+        contractAddress: GOIN_CONTRACT_ADDRESS,
         created: new Date().toISOString(),
         imported: true
       };
@@ -72,20 +97,29 @@ const CryptoMiningApp = () => {
         address: publicKey,
         privateKey: privateKey,
         mnemonic: importKey,
-        network: 'BSC Mainnet',
+        network: 'BSC Testnet',
+        contractAddress: GOIN_CONTRACT_ADDRESS,
         created: new Date().toISOString(),
         imported: true
       };
       setWallet(importedWallet);
       setWalletBalance(Math.random() * 1000);
     } else {
-      alert('Format Private Key atau Mnemonic tidak valid');
+      toast({
+        title: "Error",
+        description: "Invalid Private Key or Mnemonic format",
+        variant: "destructive",
+      });
       return;
     }
     
     setImportKey('');
     setShowImportModal(false);
-    alert('Wallet berhasil di-import!');
+    generateUserReferralCode();
+    toast({
+      title: "Success",
+      description: "Wallet imported successfully!",
+    });
   };
 
   const exportWallet = () => {
@@ -96,6 +130,7 @@ const CryptoMiningApp = () => {
       privateKey: wallet.privateKey,
       mnemonic: wallet.mnemonic,
       network: wallet.network,
+      contractAddress: wallet.contractAddress,
       exported: new Date().toISOString()
     };
     
@@ -111,16 +146,77 @@ const CryptoMiningApp = () => {
 
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
-    alert('Copied to clipboard!');
+    toast({
+      title: "Copied!",
+      description: "Copied to clipboard",
+    });
   };
 
-  const syncWalletBalance = () => {
+  // New functions for additional features
+  const generateUserReferralCode = () => {
     if (wallet) {
-      // Simulasi sync balance dari blockchain
-      setWalletBalance(prev => prev + tokens);
-      setTokens(0); // Transfer tokens ke wallet
-      alert(`${tokens.toFixed(2)} GOIN tokens berhasil di-sync ke wallet!`);
+      const code = wallet.address.substring(2, 10).toUpperCase();
+      setUserReferralCode(code);
     }
+  };
+
+  const handleWithdrawal = () => {
+    if (!wallet || !withdrawAmount) {
+      toast({
+        title: "Error",
+        description: "Please enter withdrawal amount",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const amount = parseFloat(withdrawAmount);
+    if (amount > walletBalance) {
+      toast({
+        title: "Error",
+        description: "Insufficient balance",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Simulate withdrawal process
+    setIsLoading(true);
+    setTimeout(() => {
+      setWalletBalance(prev => prev - amount);
+      setWithdrawAmount('');
+      setShowWithdrawModal(false);
+      setIsLoading(false);
+      toast({
+        title: "Withdrawal Successful",
+        description: `${amount.toFixed(4)} GOIN withdrawn to your wallet`,
+      });
+    }, 2000);
+  };
+
+  const applyReferralCode = () => {
+    if (!referralCode.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a referral code",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Simulate referral bonus
+    const bonus = 100;
+    setTokens(prev => prev + bonus);
+    setReferralCode('');
+    toast({
+      title: "Referral Applied!",
+      description: `+${bonus} GOIN bonus received!`,
+    });
+  };
+
+  const generateReferralLink = () => {
+    if (!userReferralCode) return '';
+    return `${window.location.origin}?ref=${userReferralCode}`;
   };
 
   // Mining simulation dengan interval
@@ -155,7 +251,11 @@ const CryptoMiningApp = () => {
     
     // Cooldown mechanism
     if (lastAdTime && now - lastAdTime < 30000) {
-      alert('Tunggu 30 detik sebelum menonton iklan berikutnya');
+      toast({
+        title: "Cooldown Active",
+        description: "Wait 30 seconds before watching another ad",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -206,6 +306,17 @@ const CryptoMiningApp = () => {
     }
   }, [adsWatched, tokens, level, streak, achievements]);
 
+  // Initialize sample leaderboard data
+  useEffect(() => {
+    setLeaderboard([
+      { rank: 1, username: 'MinerPro', tokens: 15420.5, level: 8 },
+      { rank: 2, username: 'CryptoKing', tokens: 12350.2, level: 7 },
+      { rank: 3, username: 'TokenMaster', tokens: 9876.8, level: 6 },
+      { rank: 4, username: 'DigitalMiner', tokens: 8543.1, level: 6 },
+      { rank: 5, username: 'You', tokens: tokens + walletBalance, level: level },
+    ]);
+  }, [tokens, walletBalance, level]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 text-white">
       {/* Header */}
@@ -229,7 +340,7 @@ const CryptoMiningApp = () => {
         <div className="flex bg-white/10 backdrop-blur-lg rounded-xl p-1 border border-white/20">
           <button
             onClick={() => setCurrentTab('mining')}
-            className={`flex-1 py-2 px-4 rounded-lg font-semibold transition-all ${
+            className={`flex-1 py-2 px-2 rounded-lg font-semibold transition-all text-xs ${
               currentTab === 'mining' 
                 ? 'bg-blue-500 text-white' 
                 : 'text-blue-300 hover:text-white'
@@ -240,7 +351,7 @@ const CryptoMiningApp = () => {
           </button>
           <button
             onClick={() => setCurrentTab('wallet')}
-            className={`flex-1 py-2 px-4 rounded-lg font-semibold transition-all ${
+            className={`flex-1 py-2 px-2 rounded-lg font-semibold transition-all text-xs ${
               currentTab === 'wallet' 
                 ? 'bg-blue-500 text-white' 
                 : 'text-blue-300 hover:text-white'
@@ -248,6 +359,28 @@ const CryptoMiningApp = () => {
           >
             <Wallet className="w-4 h-4 mx-auto mb-1" />
             Wallet
+          </button>
+          <button
+            onClick={() => setCurrentTab('referral')}
+            className={`flex-1 py-2 px-2 rounded-lg font-semibold transition-all text-xs ${
+              currentTab === 'referral' 
+                ? 'bg-blue-500 text-white' 
+                : 'text-blue-300 hover:text-white'
+            }`}
+          >
+            <Users className="w-4 h-4 mx-auto mb-1" />
+            Referral
+          </button>
+          <button
+            onClick={() => setCurrentTab('leaderboard')}
+            className={`flex-1 py-2 px-2 rounded-lg font-semibold transition-all text-xs ${
+              currentTab === 'leaderboard' 
+                ? 'bg-blue-500 text-white' 
+                : 'text-blue-300 hover:text-white'
+            }`}
+          >
+            <Trophy className="w-4 h-4 mx-auto mb-1" />
+            Leaders
           </button>
         </div>
       </div>
@@ -432,7 +565,8 @@ const CryptoMiningApp = () => {
                 <div className="mb-6">
                   <Wallet className="w-16 h-16 mx-auto mb-4 text-blue-400" />
                   <h2 className="text-2xl font-bold mb-2">GOIN Wallet</h2>
-                  <p className="text-blue-300">Binance Smart Chain (BEP20)</p>
+                  <p className="text-blue-300">BSC Testnet</p>
+                  <p className="text-xs text-gray-400 mt-1">Contract: {GOIN_CONTRACT_ADDRESS}</p>
                 </div>
                 
                 <div className="space-y-4">
@@ -478,10 +612,10 @@ const CryptoMiningApp = () => {
                         <Download className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => setShowImportModal(true)}
+                        onClick={() => setShowWithdrawModal(true)}
                         className="p-2 bg-green-500 hover:bg-green-600 rounded-lg transition-all"
                       >
-                        <Upload className="w-4 h-4" />
+                        <Send className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
@@ -514,6 +648,7 @@ const CryptoMiningApp = () => {
                         <span className="text-sm text-green-400">🟢 Connected</span>
                       </div>
                       <div className="text-sm">{wallet.network}</div>
+                      <div className="text-xs text-gray-400 mt-1">Contract: {wallet.contractAddress}</div>
                     </div>
                   </div>
                 </div>
@@ -591,7 +726,192 @@ const CryptoMiningApp = () => {
             )}
           </>
         )}
+
+        {currentTab === 'referral' && (
+          <>
+            {/* Referral System */}
+            <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
+              <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+                <Users className="text-blue-400" />
+                Referral System
+              </h2>
+              
+              {userReferralCode && (
+                <div className="space-y-4">
+                  <div className="bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-xl p-4 border border-blue-500/30">
+                    <div className="text-sm text-blue-300 mb-2">Your Referral Code</div>
+                    <div className="flex justify-between items-center">
+                      <span className="font-mono text-lg font-bold">{userReferralCode}</span>
+                      <button
+                        onClick={() => copyToClipboard(userReferralCode)}
+                        className="p-2 bg-blue-500 hover:bg-blue-600 rounded-lg transition-all"
+                      >
+                        <Copy className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-gradient-to-r from-green-500/20 to-blue-500/20 rounded-xl p-4 border border-green-500/30">
+                    <div className="text-sm text-green-300 mb-2">Referral Link</div>
+                    <div className="flex justify-between items-center gap-2">
+                      <span className="font-mono text-xs bg-black/20 p-2 rounded border break-all flex-1">
+                        {generateReferralLink()}
+                      </span>
+                      <button
+                        onClick={() => copyToClipboard(generateReferralLink())}
+                        className="p-2 bg-green-500 hover:bg-green-600 rounded-lg transition-all"
+                      >
+                        <Link className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              <div className="mt-6">
+                <h3 className="font-bold mb-3">Apply Referral Code</h3>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={referralCode}
+                    onChange={(e) => setReferralCode(e.target.value)}
+                    placeholder="Enter referral code"
+                    className="flex-1 p-3 bg-black/20 border border-white/20 rounded-lg text-white placeholder-gray-400"
+                  />
+                  <button
+                    onClick={applyReferralCode}
+                    className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-3 rounded-lg font-semibold transition-all"
+                  >
+                    Apply
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Referral Levels */}
+            <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
+              <h3 className="font-bold mb-4 flex items-center gap-2">
+                <Star className="text-yellow-400" />
+                Referral Levels
+              </h3>
+              
+              <div className="space-y-3">
+                {[
+                  { level: 'Bronze', referrals: '1-10', bonus: '5%', icon: '🥉' },
+                  { level: 'Silver', referrals: '11-25', bonus: '10%', icon: '🥈' },
+                  { level: 'Gold', referrals: '26-50', bonus: '15%', icon: '🥇' },
+                  { level: 'Platinum', referrals: '51-100', bonus: '20%', icon: '💎' },
+                  { level: 'Diamond', referrals: '100+', bonus: '25%', icon: '👑' }
+                ].map((tier, index) => (
+                  <div key={index} className="bg-white/5 rounded-lg p-4 border border-white/10">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">{tier.icon}</span>
+                        <div>
+                          <div className="font-semibold">{tier.level}</div>
+                          <div className="text-sm text-blue-300">{tier.referrals} referrals</div>
+                        </div>
+                      </div>
+                      <div className="text-green-400 font-bold">{tier.bonus}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+
+        {currentTab === 'leaderboard' && (
+          <>
+            {/* Leaderboard */}
+            <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
+              <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+                <Trophy className="text-yellow-400" />
+                Leaderboard
+              </h2>
+              
+              <div className="space-y-3">
+                {leaderboard.map((player, index) => (
+                  <div key={index} className={`rounded-lg p-4 border ${
+                    player.username === 'You' 
+                      ? 'bg-blue-500/20 border-blue-500/30' 
+                      : 'bg-white/5 border-white/10'
+                  }`}>
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
+                          player.rank === 1 ? 'bg-yellow-500 text-black' :
+                          player.rank === 2 ? 'bg-gray-400 text-black' :
+                          player.rank === 3 ? 'bg-orange-600 text-white' :
+                          'bg-white/20 text-white'
+                        }`}>
+                          {player.rank}
+                        </div>
+                        <div>
+                          <div className="font-semibold">{player.username}</div>
+                          <div className="text-sm text-blue-300">Level {player.level}</div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-bold text-green-400">{player.tokens.toFixed(1)} GOIN</div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
       </div>
+
+      {/* Withdrawal Modal */}
+      {showWithdrawModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-gray-900 rounded-2xl p-6 w-full max-w-md border border-white/20">
+            <h3 className="text-xl font-bold mb-4">Withdraw GOIN</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-blue-300 mb-2">
+                  Amount to Withdraw
+                </label>
+                <input
+                  type="number"
+                  value={withdrawAmount}
+                  onChange={(e) => setWithdrawAmount(e.target.value)}
+                  placeholder="0.0000"
+                  className="w-full p-3 bg-black/20 border border-white/20 rounded-lg text-white placeholder-gray-400"
+                />
+                <div className="text-xs text-gray-400 mt-1">
+                  Available: {walletBalance.toFixed(4)} GOIN
+                </div>
+              </div>
+              
+              <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-lg p-3">
+                <div className="text-sm text-yellow-300">
+                  ⚠️ Withdrawal will be processed to your connected wallet address.
+                </div>
+              </div>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowWithdrawModal(false)}
+                  className="flex-1 bg-white/10 hover:bg-white/20 border border-white/20 text-white py-3 rounded-xl font-semibold transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleWithdrawal}
+                  disabled={isLoading}
+                  className="flex-1 bg-green-500 hover:bg-green-600 disabled:bg-gray-500 text-white py-3 rounded-xl font-semibold transition-all"
+                >
+                  {isLoading ? 'Processing...' : 'Withdraw'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Import Modal */}
       {showImportModal && (
