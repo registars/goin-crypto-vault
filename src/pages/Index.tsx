@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Play, Pause, Zap, Coins, TrendingUp, Award, Clock, Eye, Gift, Wallet, Key, Download, Upload, Copy, Shield, RefreshCw, Send, Users, Trophy, Link, Star } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
@@ -171,6 +170,16 @@ const CryptoMiningApp = () => {
     if (wallet) {
       const code = wallet.address.substring(2, 10).toUpperCase();
       setUserReferralCode(code);
+      toast({
+        title: "Referral Code Generated!",
+        description: `Your referral code: ${code}`,
+      });
+    } else {
+      toast({
+        title: "Wallet Required",
+        description: "Please create a wallet first to generate referral code",
+        variant: "destructive",
+      });
     }
   };
 
@@ -743,19 +752,37 @@ const CryptoMiningApp = () => {
 
         {currentTab === 'referral' && (
           <>
-            {/* Referral System */}
+            {/* Create Referral Link Section */}
             <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
               <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-                <Users className="text-blue-400" />
-                Referral System
+                <Link className="text-blue-400" />
+                Create Referral Link
               </h2>
               
-              {userReferralCode && (
+              {!userReferralCode ? (
+                <div className="text-center space-y-4">
+                  <div className="bg-blue-500/20 border border-blue-500/30 rounded-lg p-4">
+                    <div className="text-sm text-blue-300 mb-2">
+                      🎯 Generate your unique referral code to start earning bonuses!
+                    </div>
+                    <div className="text-xs text-blue-200">
+                      Earn 10% of your referrals' mining rewards
+                    </div>
+                  </div>
+                  
+                  <button
+                    onClick={generateUserReferralCode}
+                    className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white py-3 rounded-xl font-semibold transition-all"
+                  >
+                    Generate Referral Code
+                  </button>
+                </div>
+              ) : (
                 <div className="space-y-4">
                   <div className="bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-xl p-4 border border-blue-500/30">
                     <div className="text-sm text-blue-300 mb-2">Your Referral Code</div>
                     <div className="flex justify-between items-center">
-                      <span className="font-mono text-lg font-bold">{userReferralCode}</span>
+                      <span className="font-mono text-lg font-bold text-yellow-400">{userReferralCode}</span>
                       <button
                         onClick={() => copyToClipboard(userReferralCode)}
                         className="p-2 bg-blue-500 hover:bg-blue-600 rounded-lg transition-all"
@@ -766,7 +793,7 @@ const CryptoMiningApp = () => {
                   </div>
                   
                   <div className="bg-gradient-to-r from-green-500/20 to-blue-500/20 rounded-xl p-4 border border-green-500/30">
-                    <div className="text-sm text-green-300 mb-2">Referral Link</div>
+                    <div className="text-sm text-green-300 mb-2">Your Referral Link</div>
                     <div className="flex justify-between items-center gap-2">
                       <span className="font-mono text-xs bg-black/20 p-2 rounded border break-all flex-1">
                         {generateReferralLink()}
@@ -779,11 +806,49 @@ const CryptoMiningApp = () => {
                       </button>
                     </div>
                   </div>
+                  
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => copyToClipboard(generateReferralLink())}
+                      className="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg font-semibold transition-all text-sm"
+                    >
+                      Copy Link
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (navigator.share) {
+                          navigator.share({
+                            title: 'Join CryptoMiner GOIN',
+                            text: 'Start mining GOIN tokens with me!',
+                            url: generateReferralLink(),
+                          });
+                        } else {
+                          copyToClipboard(generateReferralLink());
+                        }
+                      }}
+                      className="flex-1 bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded-lg font-semibold transition-all text-sm"
+                    >
+                      Share
+                    </button>
+                  </div>
                 </div>
               )}
+            </div>
+
+            {/* Apply Referral Code Section */}
+            <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
+              <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+                <Users className="text-green-400" />
+                Apply Referral Code
+              </h2>
               
-              <div className="mt-6">
-                <h3 className="font-bold mb-3">Apply Referral Code</h3>
+              <div className="space-y-4">
+                <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-lg p-3">
+                  <div className="text-sm text-yellow-300">
+                    💰 Enter a friend's referral code to get 100 GOIN bonus!
+                  </div>
+                </div>
+                
                 <div className="flex gap-2">
                   <input
                     type="text"
@@ -794,7 +859,7 @@ const CryptoMiningApp = () => {
                   />
                   <button
                     onClick={applyReferralCode}
-                    className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-3 rounded-lg font-semibold transition-all"
+                    className="bg-green-500 hover:bg-green-600 text-white px-4 py-3 rounded-lg font-semibold transition-all"
                   >
                     Apply
                   </button>
