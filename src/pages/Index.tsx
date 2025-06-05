@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Play, Pause, Zap, Coins, TrendingUp, Award, Clock, Eye, Gift, Wallet, Key, Download, Upload, Copy, Shield, RefreshCw, Send, Users, Trophy, Link, Star } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { ethers } from 'ethers';
+import { connectWallet, getGOINContract, addBSCNetwork } from '../utils/web3Provider';
+import { simulateBackendClaim } from '../utils/contractService';
 
 // GOIN Token Contract Address on Testnet
 const GOIN_CONTRACT_ADDRESS = '0xf202f380d4e244d2b1b0c6f3de346a1ce154cc7a';
@@ -25,6 +27,12 @@ const CryptoMiningApp = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [dailyBonus, setDailyBonus] = useState(true);
   const [achievements, setAchievements] = useState([]);
+
+  // Web3 state variables
+  const [provider, setProvider] = useState(null);
+  const [contract, setContract] = useState(null);
+  const [userAddress, setUserAddress] = useState('');
+  const [isConnectedToBlockchain, setIsConnectedToBlockchain] = useState(false);
 
   // New state variables for additional features
   const [withdrawAmount, setWithdrawAmount] = useState('');
@@ -162,17 +170,119 @@ const CryptoMiningApp = () => {
     });
   };
 
-  // Add the missing syncWalletBalance function
-  const syncWalletBalance = () => {
-    if (wallet && tokens > 0) {
-      // Simulate sync balance from blockchain
-      setWalletBalance(prev => prev + tokens);
-      setTokens(0); // Transfer tokens to wallet
-      toast({
-        title: "Sync Successful",
-        description: `${tokens.toFixed(2)} GOIN tokens synced to wallet!`,
+  // Connect to blockchain
+  const connectToBlockchain = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Add BSC network first
+      await addBSCNetwork();
+      
+      const web3Provider = await connectWallet();
+      const signer = web3Provider.getSigner();
+      const address = await signer.getAddress();
+      
+      setProvider(web3Provider);
+      setContract(getGOINContract(web3Provider));
+      setUserAddress(address);
+      setIsConnectedToBlockchain(true);
+      
+      // Load balance from contract
+      try {
+        const balance = await getGOINContract(web3Provider).balanceOf(address);
+        setWalletBalance(parseFloat(ethers.utils.formatEther(balance)));
+      } catch (error) {
+        console.error("Error loading balance:", error);
+        setWalletBalance(0);
+      }
+      
+      // Update wallet info
+      setWallet({
+        address: address,
+        privateKey: 'Connected via Web3',
+        mnemonic: 'External Wallet',
+        network: 'BSC Testnet',
+        contractAddress: GOIN_CONTRACT_ADDRESS,
+        created: new Date().toISOString(),
+        isWeb3: true
       });
+
+      generateUserReferralCode();
+      
+      toast({
+        title: "Blockchain Connected!",
+        description: `Connected to ${address.substring(0, 6)}...${address.substring(38)}`,
+      });
+    } catch (error) {
+      console.error("Error connecting to blockchain:", error);
+      toast({
+        title: "Connection Failed",
+        description: "Failed to connect to blockchain. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
     }
+  };
+
+  // Sync tokens to blockchain
+  const syncToBlockchain = async () => {
+    if (!provider || tokens <= 0) return;
+    
+    try {
+      setIsLoading(true);
+      
+      // Jika tidak terkoneksi wallet
+      if (!userAddress) {
+        await connectToBlockchain();
+        return;
+      }
+      
+      // Dapatkan nonce
+      const nonce = await provider.getTransactionCount(userAddress);
+      
+      // Buat signature
+      const message = `Claim ${tokens} GOIN for ${userAddress} (nonce: ${nonce})`;
+      const signature = await provider.getSigner().signMessage(message);
+      
+      // Simulasi backend claim (karena ini testnet)
+      const result = await simulateBackendClaim(userAddress, tokens.toString(), signature, nonce);
+      
+      if (result.success) {
+        // Update balance (simulasi)
+        setWalletBalance(prev => prev + tokens);
+        setTokens(0);
+        
+        toast({
+          title: "Claim Successful!",
+          description: `${tokens.toFixed(2)} GOIN tokens claimed to blockchain!`,
+        });
+      } else {
+        toast({
+          title: "Claim Failed",
+          description: result.error || "Failed to claim tokens",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Claim error:", error);
+      toast({
+        title: "Error",
+        description: "Failed to claim tokens to blockchain",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Updated syncWalletBalance function
+  const syncWalletBalance = async () => {
+    if (!isConnectedToBlockchain) {
+      await connectToBlockchain();
+      return;
+    }
+    await syncToBlockchain();
   };
 
   // New functions for additional features
@@ -314,7 +424,7 @@ const CryptoMiningApp = () => {
       setTokens(prev => prev + bonus);
       setDailyBonus(false);
       // Reset daily bonus setelah 24 jam
-      setTimeout(() => setDailyBonus(true), 86400000);
+      setTimeout(() => setDailyBonus(true), 864000);
     }
   };
 
@@ -363,6 +473,12 @@ const CryptoMiningApp = () => {
             <div className="text-right">
               <div className="text-lg font-bold">{tokens.toFixed(2)} GOIN</div>
               <div className="text-xs text-blue-300">Level {level}</div>
+              {isConnectedToBlockchain && (
+                <div className="text-xs text-green-400 flex items-center gap-1">
+                  <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                  Web3 Connected
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -421,6 +537,28 @@ const CryptoMiningApp = () => {
       <div className="max-w-md mx-auto p-4 space-y-6">
         {currentTab === 'mining' && (
           <>
+            {/* Blockchain Connection Status */}
+            {!isConnectedToBlockchain && (
+              <div className="bg-gradient-to-r from-orange-500/20 to-red-500/20 rounded-xl p-4 border border-orange-500/30">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <div className="flex items-center gap-2 text-orange-400">
+                      <Shield />
+                      <span className="font-semibold">Connect to Blockchain</span>
+                    </div>
+                    <div className="text-sm text-orange-300">Connect wallet to claim tokens on BSC</div>
+                  </div>
+                  <button
+                    onClick={connectToBlockchain}
+                    disabled={isLoading}
+                    className="bg-orange-500 hover:bg-orange-600 disabled:bg-gray-500 text-white px-4 py-2 rounded-lg font-semibold transition-all"
+                  >
+                    {isLoading ? 'Connecting...' : 'Connect'}
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Mining Status */}
             <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
               <div className="text-center space-y-4">
@@ -455,23 +593,30 @@ const CryptoMiningApp = () => {
               </div>
             </div>
 
-            {/* Wallet Sync */}
+            {/* Enhanced Wallet Sync */}
             {wallet && (
               <div className="bg-gradient-to-r from-green-500/20 to-blue-500/20 rounded-xl p-4 border border-green-500/30">
                 <div className="flex justify-between items-center">
                   <div>
                     <div className="flex items-center gap-2 text-green-400">
                       <Wallet />
-                      <span className="font-semibold">Sync to Wallet</span>
+                      <span className="font-semibold">
+                        {isConnectedToBlockchain ? 'Claim to Blockchain' : 'Sync to Wallet'}
+                      </span>
                     </div>
-                    <div className="text-sm text-green-300">Transfer {tokens.toFixed(2)} GOIN to wallet</div>
+                    <div className="text-sm text-green-300">
+                      {isConnectedToBlockchain 
+                        ? `Claim ${tokens.toFixed(2)} GOIN to BSC blockchain`
+                        : `Transfer ${tokens.toFixed(2)} GOIN to wallet`
+                      }
+                    </div>
                   </div>
                   <button
                     onClick={syncWalletBalance}
-                    disabled={tokens === 0}
+                    disabled={tokens === 0 || isLoading}
                     className="bg-green-500 hover:bg-green-600 disabled:bg-gray-500 text-white px-4 py-2 rounded-lg font-semibold transition-all"
                   >
-                    Sync
+                    {isLoading ? 'Processing...' : isConnectedToBlockchain ? 'Claim' : 'Sync'}
                   </button>
                 </div>
               </div>
@@ -604,8 +749,18 @@ const CryptoMiningApp = () => {
                 
                 <div className="space-y-4">
                   <button
+                    onClick={connectToBlockchain}
+                    disabled={isLoading}
+                    className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 disabled:from-gray-500 disabled:to-gray-600 text-white py-3 rounded-xl font-semibold transition-all"
+                  >
+                    {isLoading ? 'Connecting...' : 'Connect Web3 Wallet'}
+                  </button>
+                  
+                  <div className="text-sm text-gray-400">or</div>
+                  
+                  <button
                     onClick={generateWallet}
-                    className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white py-3 rounded-xl font-semibold transition-all"
+                    className="w-full bg-white/10 hover:bg-white/20 border border-white/20 text-white py-3 rounded-xl font-semibold transition-all"
                   >
                     Generate New Wallet
                   </button>
@@ -638,12 +793,14 @@ const CryptoMiningApp = () => {
                       GOIN Wallet (BEP20)
                     </h2>
                     <div className="flex gap-2">
-                      <button
-                        onClick={exportWallet}
-                        className="p-2 bg-blue-500 hover:bg-blue-600 rounded-lg transition-all"
-                      >
-                        <Download className="w-4 h-4" />
-                      </button>
+                      {!wallet.isWeb3 && (
+                        <button
+                          onClick={exportWallet}
+                          className="p-2 bg-blue-500 hover:bg-blue-600 rounded-lg transition-all"
+                        >
+                          <Download className="w-4 h-4" />
+                        </button>
+                      )}
                       <button
                         onClick={() => setShowWithdrawModal(true)}
                         className="p-2 bg-green-500 hover:bg-green-600 rounded-lg transition-all"
@@ -686,69 +843,71 @@ const CryptoMiningApp = () => {
                   </div>
                 </div>
 
-                {/* Private Key Section */}
-                <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
-                  <div className="flex items-center gap-2 mb-4">
-                    <Key className="text-yellow-400" />
-                    <h3 className="font-bold">Private Key & Security</h3>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <div className="bg-green-500/20 border border-green-500/30 rounded-lg p-3">
-                      <div className="text-sm text-green-300 mb-2">✅ Compatible dengan wallet lain</div>
-                      <div className="text-xs text-green-200">
-                        Private key dan mnemonic ini dapat digunakan di MetaMask, Trust Wallet, atau wallet BEP20 lainnya.
-                      </div>
+                {/* Private Key Section - only show for generated wallets */}
+                {!wallet.isWeb3 && (
+                  <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Key className="text-yellow-400" />
+                      <h3 className="font-bold">Private Key & Security</h3>
                     </div>
                     
-                    <div className="bg-red-500/20 border border-red-500/30 rounded-lg p-3">
-                      <div className="text-sm text-red-300 mb-2">⚠️ Warning</div>
-                      <div className="text-xs text-red-200">
-                        Jangan pernah membagikan private key atau mnemonic phrase kepada siapa pun!
+                    <div className="space-y-4">
+                      <div className="bg-green-500/20 border border-green-500/30 rounded-lg p-3">
+                        <div className="text-sm text-green-300 mb-2">✅ Compatible dengan wallet lain</div>
+                        <div className="text-xs text-green-200">
+                          Private key dan mnemonic ini dapat digunakan di MetaMask, Trust Wallet, atau wallet BEP20 lainnya.
+                        </div>
                       </div>
-                    </div>
-                    
-                    <div className="space-y-3">
-                      <div>
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="text-sm text-blue-300">Private Key</span>
-                          <div className="flex gap-2">
+                      
+                      <div className="bg-red-500/20 border border-red-500/30 rounded-lg p-3">
+                        <div className="text-sm text-red-300 mb-2">⚠️ Warning</div>
+                        <div className="text-xs text-red-200">
+                          Jangan pernah membagikan private key atau mnemonic phrase kepada siapa pun!
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        <div>
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="text-sm text-blue-300">Private Key</span>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => setShowPrivateKey(!showPrivateKey)}
+                                className="p-1 hover:bg-white/10 rounded text-yellow-400"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => copyToClipboard(wallet.privateKey)}
+                                className="p-1 hover:bg-white/10 rounded"
+                              >
+                                <Copy className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                          <div className="font-mono text-xs bg-black/20 p-2 rounded border break-all">
+                            {showPrivateKey ? wallet.privateKey : '•'.repeat(64)}
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="text-sm text-blue-300">Mnemonic Phrase</span>
                             <button
-                              onClick={() => setShowPrivateKey(!showPrivateKey)}
-                              className="p-1 hover:bg-white/10 rounded text-yellow-400"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => copyToClipboard(wallet.privateKey)}
+                              onClick={() => copyToClipboard(wallet.mnemonic)}
                               className="p-1 hover:bg-white/10 rounded"
                             >
                               <Copy className="w-4 h-4" />
                             </button>
                           </div>
-                        </div>
-                        <div className="font-mono text-xs bg-black/20 p-2 rounded border break-all">
-                          {showPrivateKey ? wallet.privateKey : '•'.repeat(64)}
-                        </div>
-                      </div>
-                      
-                      <div>
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="text-sm text-blue-300">Mnemonic Phrase</span>
-                          <button
-                            onClick={() => copyToClipboard(wallet.mnemonic)}
-                            className="p-1 hover:bg-white/10 rounded"
-                          >
-                            <Copy className="w-4 h-4" />
-                          </button>
-                        </div>
-                        <div className="text-xs bg-black/20 p-2 rounded border">
-                          {showPrivateKey ? wallet.mnemonic : '•'.repeat(wallet.mnemonic.length)}
+                          <div className="text-xs bg-black/20 p-2 rounded border">
+                            {showPrivateKey ? wallet.mnemonic : '•'.repeat(wallet.mnemonic.length)}
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
+                )}
 
                 {/* Transaction History Placeholder */}
                 <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
@@ -838,6 +997,8 @@ const CryptoMiningApp = () => {
                             title: 'Join CryptoMiner GOIN',
                             text: 'Start mining GOIN tokens with me!',
                             url: generateReferralLink(),
+                          }).catch(() => {
+                            copyToClipboard(generateReferralLink());
                           });
                         } else {
                           copyToClipboard(generateReferralLink());
