@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Play, Pause, Zap, Coins, TrendingUp, Award, Clock, Eye, Gift, Wallet, Key, Download, Upload, Copy, Shield, RefreshCw, Send, Users, Trophy, Link, Star } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
+import { ethers } from 'ethers';
 
 // GOIN Token Contract Address on Testnet
 const GOIN_CONTRACT_ADDRESS = '0xf202f380d4e244d2b1b0c6f3de346a1ce154cc7a';
@@ -38,26 +39,34 @@ const CryptoMiningApp = () => {
 
   // Wallet Generation (BEP20 compatible)
   const generateWallet = () => {
-    // Simulasi generate wallet BEP20
-    const privateKey = '0x' + Array.from({length: 64}, () => Math.floor(Math.random() * 16).toString(16)).join('');
-    const publicKey = '0x' + Array.from({length: 40}, () => Math.floor(Math.random() * 16).toString(16)).join('');
-    
-    const newWallet = {
-      address: publicKey,
-      privateKey: privateKey,
-      mnemonic: generateMnemonic(),
-      network: 'BSC Testnet',
-      contractAddress: GOIN_CONTRACT_ADDRESS,
-      created: new Date().toISOString()
-    };
-    
-    setWallet(newWallet);
-    setWalletBalance(0);
-    generateUserReferralCode();
-    toast({
-      title: "Wallet Created!",
-      description: "GOIN wallet on BSC Testnet created successfully",
-    });
+    try {
+      // Generate a new random wallet
+      const randomWallet = ethers.Wallet.createRandom();
+      
+      const newWallet = {
+        address: randomWallet.address,
+        privateKey: randomWallet.privateKey,
+        mnemonic: randomWallet.mnemonic.phrase,
+        network: 'BSC Testnet',
+        contractAddress: GOIN_CONTRACT_ADDRESS,
+        created: new Date().toISOString()
+      };
+      
+      setWallet(newWallet);
+      setWalletBalance(0);
+      generateUserReferralCode();
+      toast({
+        title: "Wallet Created!",
+        description: "BEP20 wallet on BSC Testnet created successfully",
+      });
+    } catch (error) {
+      console.error('Error generating wallet:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate wallet. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const generateMnemonic = () => {
@@ -75,51 +84,52 @@ const CryptoMiningApp = () => {
       return;
     }
     
-    if (importKey.startsWith('0x') && importKey.length === 66) {
-      // Import dari private key
-      const publicKey = '0x' + Array.from({length: 40}, () => Math.floor(Math.random() * 16).toString(16)).join('');
-      const importedWallet = {
-        address: publicKey,
-        privateKey: importKey,
-        mnemonic: generateMnemonic(),
+    try {
+      let importedWallet;
+      
+      if (importKey.startsWith('0x') && importKey.length === 66) {
+        // Import from private key
+        importedWallet = new ethers.Wallet(importKey);
+      } else if (importKey.split(' ').length === 12 || importKey.split(' ').length === 24) {
+        // Import from mnemonic
+        importedWallet = ethers.Wallet.fromPhrase(importKey);
+      } else {
+        toast({
+          title: "Error",
+          description: "Invalid Private Key or Mnemonic format",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      const walletData = {
+        address: importedWallet.address,
+        privateKey: importedWallet.privateKey,
+        mnemonic: importedWallet.mnemonic?.phrase || 'N/A',
         network: 'BSC Testnet',
         contractAddress: GOIN_CONTRACT_ADDRESS,
         created: new Date().toISOString(),
         imported: true
       };
-      setWallet(importedWallet);
-      setWalletBalance(Math.random() * 1000); // Simulasi balance
-    } else if (importKey.split(' ').length === 12) {
-      // Import dari mnemonic
-      const privateKey = '0x' + Array.from({length: 64}, () => Math.floor(Math.random() * 16).toString(16)).join('');
-      const publicKey = '0x' + Array.from({length: 40}, () => Math.floor(Math.random() * 16).toString(16)).join('');
-      const importedWallet = {
-        address: publicKey,
-        privateKey: privateKey,
-        mnemonic: importKey,
-        network: 'BSC Testnet',
-        contractAddress: GOIN_CONTRACT_ADDRESS,
-        created: new Date().toISOString(),
-        imported: true
-      };
-      setWallet(importedWallet);
-      setWalletBalance(Math.random() * 1000);
-    } else {
+      
+      setWallet(walletData);
+      setWalletBalance(Math.random() * 1000); // Simulate balance
+      setImportKey('');
+      setShowImportModal(false);
+      generateUserReferralCode();
+      
+      toast({
+        title: "Success",
+        description: "Wallet imported successfully!",
+      });
+    } catch (error) {
+      console.error('Error importing wallet:', error);
       toast({
         title: "Error",
         description: "Invalid Private Key or Mnemonic format",
         variant: "destructive",
       });
-      return;
     }
-    
-    setImportKey('');
-    setShowImportModal(false);
-    generateUserReferralCode();
-    toast({
-      title: "Success",
-      description: "Wallet imported successfully!",
-    });
   };
 
   const exportWallet = () => {
@@ -588,7 +598,7 @@ const CryptoMiningApp = () => {
                 <div className="mb-6">
                   <Wallet className="w-16 h-16 mx-auto mb-4 text-blue-400" />
                   <h2 className="text-2xl font-bold mb-2">GOIN Wallet</h2>
-                  <p className="text-blue-300">BSC Testnet</p>
+                  <p className="text-blue-300">BSC Testnet (BEP20)</p>
                   <p className="text-xs text-gray-400 mt-1">Contract: {GOIN_CONTRACT_ADDRESS}</p>
                 </div>
                 
@@ -614,7 +624,7 @@ const CryptoMiningApp = () => {
                     <span className="font-semibold">Security Notice</span>
                   </div>
                   <p className="text-sm text-yellow-300">
-                    Simpan private key dan mnemonic phrase dengan aman. Jangan bagikan kepada siapa pun!
+                    Wallet menggunakan standard BEP20/BSC. Private key dan mnemonic dapat digunakan di wallet lain seperti MetaMask atau Trust Wallet.
                   </p>
                 </div>
               </div>
@@ -625,7 +635,7 @@ const CryptoMiningApp = () => {
                   <div className="flex justify-between items-center mb-4">
                     <h2 className="text-xl font-bold flex items-center gap-2">
                       <Wallet className="text-blue-400" />
-                      GOIN Wallet
+                      GOIN Wallet (BEP20)
                     </h2>
                     <div className="flex gap-2">
                       <button
@@ -652,7 +662,7 @@ const CryptoMiningApp = () => {
                     
                     <div className="bg-white/5 rounded-xl p-4 border border-white/10">
                       <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm text-blue-300">Wallet Address</span>
+                        <span className="text-sm text-blue-300">Wallet Address (BEP20)</span>
                         <button
                           onClick={() => copyToClipboard(wallet.address)}
                           className="p-1 hover:bg-white/10 rounded"
@@ -668,7 +678,7 @@ const CryptoMiningApp = () => {
                     <div className="bg-white/5 rounded-xl p-4 border border-white/10">
                       <div className="flex justify-between items-center mb-2">
                         <span className="text-sm text-blue-300">Network</span>
-                        <span className="text-sm text-green-400">🟢 Connected</span>
+                        <span className="text-sm text-green-400">🟢 BSC Testnet</span>
                       </div>
                       <div className="text-sm">{wallet.network}</div>
                       <div className="text-xs text-gray-400 mt-1">Contract: {wallet.contractAddress}</div>
@@ -684,6 +694,13 @@ const CryptoMiningApp = () => {
                   </div>
                   
                   <div className="space-y-4">
+                    <div className="bg-green-500/20 border border-green-500/30 rounded-lg p-3">
+                      <div className="text-sm text-green-300 mb-2">✅ Compatible dengan wallet lain</div>
+                      <div className="text-xs text-green-200">
+                        Private key dan mnemonic ini dapat digunakan di MetaMask, Trust Wallet, atau wallet BEP20 lainnya.
+                      </div>
+                    </div>
+                    
                     <div className="bg-red-500/20 border border-red-500/30 rounded-lg p-3">
                       <div className="text-sm text-red-300 mb-2">⚠️ Warning</div>
                       <div className="text-xs text-red-200">
@@ -996,7 +1013,7 @@ const CryptoMiningApp = () => {
       {showImportModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-gray-900 rounded-2xl p-6 w-full max-w-md border border-white/20">
-            <h3 className="text-xl font-bold mb-4">Import Wallet</h3>
+            <h3 className="text-xl font-bold mb-4">Import BEP20 Wallet</h3>
             
             <div className="space-y-4">
               <div>
@@ -1006,15 +1023,15 @@ const CryptoMiningApp = () => {
                 <textarea
                   value={importKey}
                   onChange={(e) => setImportKey(e.target.value)}
-                  placeholder="Masukkan private key (0x...) atau mnemonic phrase (12 kata)"
+                  placeholder="Masukkan private key (0x...) atau mnemonic phrase (12/24 kata)"
                   className="w-full p-3 bg-black/20 border border-white/20 rounded-lg text-white placeholder-gray-400"
                   rows={3}
                 />
               </div>
               
-              <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-lg p-3">
-                <div className="text-sm text-yellow-300">
-                  ⚠️ Pastikan Anda memasukkan informasi dengan benar. Wallet yang diimport akan menggantikan wallet saat ini.
+              <div className="bg-green-500/20 border border-green-500/30 rounded-lg p-3">
+                <div className="text-sm text-green-300">
+                  ✅ Wallet yang diimport akan kompatibel dengan MetaMask dan wallet BEP20 lainnya.
                 </div>
               </div>
               
