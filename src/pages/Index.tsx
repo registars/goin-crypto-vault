@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Play, Pause, Zap, Coins, TrendingUp, Award, Clock, Eye, Gift, Wallet, Key, Download, Upload, Copy, Shield, RefreshCw, Send, Users, Trophy, Link, Star } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
@@ -150,6 +151,19 @@ const CryptoMiningApp = () => {
       title: "Copied!",
       description: "Copied to clipboard",
     });
+  };
+
+  // Add the missing syncWalletBalance function
+  const syncWalletBalance = () => {
+    if (wallet && tokens > 0) {
+      // Simulate sync balance from blockchain
+      setWalletBalance(prev => prev + tokens);
+      setTokens(0); // Transfer tokens to wallet
+      toast({
+        title: "Sync Successful",
+        description: `${tokens.toFixed(2)} GOIN tokens synced to wallet!`,
+      });
+    }
   };
 
   // New functions for additional features
