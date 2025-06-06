@@ -23,8 +23,9 @@ export const mintTokensToAddress = async (address: string, amount: string): Prom
     console.log(`Attempting to mint ${amount} GOIN to ${address}`);
     console.log(`Amount in Wei: ${amountInWei.toString()}`);
     
-    // Check if the owner wallet has enough gas
-    const balance = await contract.runner.provider.getBalance(await contract.runner.getAddress());
+    // Check if the owner wallet has enough gas - cast to Wallet to access getAddress
+    const ownerWallet = contract.runner as ethers.Wallet;
+    const balance = await contract.runner!.provider!.getBalance(ownerWallet.address);
     console.log(`Owner wallet balance: ${ethers.formatEther(balance)} BNB`);
     
     if (balance < ethers.parseEther("0.001")) {
