@@ -2,12 +2,36 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { toast } from 'sonner';
+import { useToast } from '@/hooks/use-toast';
 import { connectWallet, getGOINContract, addBSCNetwork, getOwnerContract } from '@/utils/web3Provider';
 import { simulateBackendClaim, getContractBalance, getContractInfo } from '@/utils/contractService';
 import { saveTokens, loadTokens, saveMiningState, loadMiningState } from '@/utils/localStorage';
 import { BrowserProvider } from 'ethers';
+import { ethers } from 'ethers';
 import GoatMiningAnimation from '@/components/GoatMiningAnimation';
+import { 
+  Zap, 
+  Wallet, 
+  Users, 
+  Trophy, 
+  Shield, 
+  Eye, 
+  Award, 
+  Gift, 
+  TrendingUp, 
+  Clock, 
+  RefreshCw, 
+  Coins, 
+  Link, 
+  Key, 
+  Download, 
+  Send, 
+  Copy,
+  Star
+} from 'lucide-react';
+
+// Constants
+const GOIN_CONTRACT_ADDRESS = "0xf202f380d4e244d2b1b0c6f3de346a1ce154cc7a";
 
 const Index = () => {
   const [isMining, setIsMining] = useState(false);
@@ -27,7 +51,12 @@ const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [dailyBonus, setDailyBonus] = useState(true);
   const [achievements, setAchievements] = useState([]);
-  const [contractInfo, setContractInfo] = useState({});
+  const [contractInfo, setContractInfo] = useState<{
+    name?: string;
+    symbol?: string;
+    decimals?: number;
+    totalSupply?: string;
+  }>({});
 
   // Web3 state variables
   const [provider, setProvider] = useState<BrowserProvider | null>(null);
@@ -89,6 +118,21 @@ const Index = () => {
       });
     }
   }, [miningRate, level, experience, streak, adsWatched, userAddress]);
+
+  // Load contract info on component mount
+  useEffect(() => {
+    const loadContractInfo = async () => {
+      try {
+        const info = await getContractInfo();
+        setContractInfo(info);
+        console.log('Contract info loaded:', info);
+      } catch (error) {
+        console.error('Error loading contract info:', error);
+      }
+    };
+    
+    loadContractInfo();
+  }, []);
 
   // Wallet Generation (BEP20 compatible)
   const generateWallet = () => {
@@ -209,7 +253,7 @@ const Index = () => {
     URL.revokeObjectURL(url);
   };
 
-  const copyToClipboard = (text) => {
+  const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     toast({
       title: "Copied!",
@@ -439,7 +483,7 @@ const Index = () => {
 
   // Mining simulation dengan interval
   useEffect(() => {
-    let interval;
+    let interval: NodeJS.Timeout;
     if (isMining) {
       interval = setInterval(() => {
         setTokens(prev => prev + miningRate);
@@ -452,7 +496,9 @@ const Index = () => {
         }
       }, 1000);
     }
-    return () => clearInterval(interval);
+    return () => {
+      if (interval) clearInterval(interval);
+    };
   }, [isMining, miningRate, experience, level]);
 
   // Simulasi iklan dengan berbagai jenis reward
@@ -464,7 +510,7 @@ const Index = () => {
     { name: 'App Install', reward: 500, icon: '📱', time: 180 }
   ];
 
-  const watchAd = (adType) => {
+  const watchAd = (adType: any) => {
     const now = Date.now();
     
     // Cooldown mechanism
@@ -505,7 +551,7 @@ const Index = () => {
 
   // Achievement system
   useEffect(() => {
-    const newAchievements = [];
+    const newAchievements: string[] = [];
     if (adsWatched >= 10 && !achievements.includes('Ad Watcher')) {
       newAchievements.push('Ad Watcher');
     }
@@ -547,7 +593,7 @@ const Index = () => {
           {contractInfo.name && (
             <div className="flex justify-center space-x-4 text-sm">
               <Badge variant="outline">{contractInfo.name} ({contractInfo.symbol})</Badge>
-              <Badge variant="outline">Supply: {parseFloat(contractInfo.totalSupply).toFixed(2)}</Badge>
+              <Badge variant="outline">Supply: {parseFloat(contractInfo.totalSupply || '0').toFixed(2)}</Badge>
               <Badge variant="outline">Testnet</Badge>
             </div>
           )}
@@ -646,7 +692,7 @@ const Index = () => {
                       {isMining ? (
                         <Zap className="w-8 h-8 text-yellow-300 animate-bounce" />
                       ) : (
-                        <Pause className="w-8 h-8 text-gray-300" />
+                        <div className="w-8 h-8 text-gray-300">⏸</div>
                       )}
                     </div>
                     {isMining && (
@@ -1167,7 +1213,7 @@ const Index = () => {
                 </h2>
                 
                 <div className="space-y-3">
-                  {leaderboard.map((player, index) => (
+                  {leaderboard.map((player: any, index) => (
                     <div key={index} className={`rounded-lg p-4 border ${
                       player.username === 'You' 
                         ? 'bg-blue-500/20 border-blue-500/30' 
