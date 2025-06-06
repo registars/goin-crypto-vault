@@ -4,6 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ethers, BrowserProvider } from 'ethers';
 import { connectWallet, getGOINContract, addBSCNetwork } from '../utils/web3Provider';
 import { simulateBackendClaim, getContractBalance } from '../utils/contractService';
+import { saveTokens, loadTokens, saveMiningState, loadMiningState } from '../utils/localStorage';
 
 // GOIN Token Contract Address on Testnet
 const GOIN_CONTRACT_ADDRESS = '0xf202f380d4e244d2b1b0c6f3de346a1ce154cc7a';
@@ -45,6 +46,50 @@ const CryptoMiningApp = () => {
 
   const { toast } = useToast();
 
+  // Load saved data when user address changes
+  useEffect(() => {
+    if (userAddress) {
+      console.log('Loading saved data for address:', userAddress);
+      const savedTokens = loadTokens(userAddress);
+      const savedState = loadMiningState(userAddress);
+      
+      if (savedTokens > 0) {
+        setTokens(savedTokens);
+        console.log('Loaded saved tokens:', savedTokens);
+      }
+      
+      if (savedState) {
+        setMiningRate(savedState.miningRate || 0.1);
+        setLevel(savedState.level || 1);
+        setExperience(savedState.experience || 0);
+        setStreak(savedState.streak || 0);
+        setAdsWatched(savedState.adsWatched || 0);
+        console.log('Loaded saved mining state:', savedState);
+      }
+    }
+  }, [userAddress]);
+
+  // Save tokens whenever they change
+  useEffect(() => {
+    if (userAddress && tokens > 0) {
+      saveTokens(userAddress, tokens);
+    }
+  }, [tokens, userAddress]);
+
+  // Save mining state whenever it changes
+  useEffect(() => {
+    if (userAddress) {
+      saveMiningState(userAddress, {
+        miningRate,
+        level,
+        experience,
+        streak,
+        adsWatched,
+        lastActivity: Date.now()
+      });
+    }
+  }, [miningRate, level, experience, streak, adsWatched, userAddress]);
+
   // Wallet Generation (BEP20 compatible)
   const generateWallet = () => {
     try {
@@ -61,6 +106,7 @@ const CryptoMiningApp = () => {
       };
       
       setWallet(newWallet);
+      setUserAddress(newWallet.address);
       setWalletBalance(0);
       generateUserReferralCode();
       toast({
@@ -121,6 +167,7 @@ const CryptoMiningApp = () => {
       };
       
       setWallet(walletData);
+      setUserAddress(walletData.address);
       setWalletBalance(Math.random() * 1000); // Simulate balance
       setImportKey('');
       setShowImportModal(false);
@@ -252,7 +299,10 @@ const CryptoMiningApp = () => {
         // Update balance by fetching from contract
         const newBalance = await getContractBalance(userAddress);
         setWalletBalance(parseFloat(newBalance));
+        
+        // Reset tokens to 0 and save state
         setTokens(0);
+        saveTokens(userAddress, 0);
         
         toast({
           title: "Tokens Minted Successfully!",
