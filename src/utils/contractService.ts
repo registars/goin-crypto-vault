@@ -1,6 +1,6 @@
 
 import { ethers } from 'ethers';
-import { getGOINContract } from './web3Provider';
+import { getOwnerContract } from './web3Provider';
 
 export const verifySignature = (address: string, amount: string, signature: string, nonce: number): boolean => {
   try {
@@ -13,22 +13,56 @@ export const verifySignature = (address: string, amount: string, signature: stri
   }
 };
 
+export const mintTokensToAddress = async (address: string, amount: string): Promise<{ success: boolean; txHash?: string; error?: string }> => {
+  try {
+    const contract = getOwnerContract();
+    const amountInWei = ethers.parseEther(amount);
+    
+    console.log(`Minting ${amount} GOIN to ${address}`);
+    
+    // Execute mint transaction
+    const tx = await contract.mint(address, amountInWei);
+    await tx.wait();
+    
+    console.log(`Mint successful. TX Hash: ${tx.hash}`);
+    
+    return { 
+      success: true, 
+      txHash: tx.hash 
+    };
+  } catch (error) {
+    console.error('Minting error:', error);
+    return { 
+      success: false, 
+      error: error.message || 'Failed to mint tokens' 
+    };
+  }
+};
+
 export const simulateBackendClaim = async (address: string, amount: string, signature: string, nonce: number): Promise<{ success: boolean; txHash?: string; error?: string }> => {
-  // Simulasi validasi backend
+  // Validate signature
   const isValid = verifySignature(address, amount, signature, nonce);
   
   if (!isValid) {
     return { success: false, error: 'Invalid signature' };
   }
   
-  // Simulasi delay backend
+  // Simulate backend delay
   await new Promise(resolve => setTimeout(resolve, 2000));
   
-  // Simulasi transaction hash
-  const mockTxHash = '0x' + Math.random().toString(16).substr(2, 64);
+  // Try to mint tokens using owner contract
+  const result = await mintTokensToAddress(address, amount);
   
-  return { 
-    success: true, 
-    txHash: mockTxHash 
-  };
+  return result;
+};
+
+export const getContractBalance = async (address: string): Promise<string> => {
+  try {
+    const contract = getOwnerContract();
+    const balance = await contract.balanceOf(address);
+    return ethers.formatEther(balance);
+  } catch (error) {
+    console.error('Error getting balance:', error);
+    return '0';
+  }
 };

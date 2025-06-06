@@ -12,16 +12,17 @@ export const connectWallet = async () => {
 };
 
 export const getGOINContract = (provider: BrowserProvider) => {
-  const contractAddress = "0xf202f380d4e244d2b1b0c6f3de346a1ce154cc7a"; // Alamat kontrak GOIN
+  const contractAddress = "0xf202f380d4e244d2b1b0c6f3de346a1ce154cc7a"; // GOIN contract address
   const abi = [
-    // Standard BEP20 ABI + fungsi tambahan
+    // Standard BEP20 ABI + additional functions
     "function balanceOf(address owner) view returns (uint256)",
     "function transfer(address to, uint256 amount) returns (bool)",
     "function mint(address to, uint256 amount)",
     "function name() view returns (string)",
     "function symbol() view returns (string)",
     "function decimals() view returns (uint8)",
-    "function totalSupply() view returns (uint256)"
+    "function totalSupply() view returns (uint256)",
+    "function owner() view returns (address)"
   ];
   return new Contract(contractAddress, abi, provider);
 };
@@ -45,4 +46,25 @@ export const addBSCNetwork = async () => {
   } catch (error) {
     console.error("Error adding BSC network:", error);
   }
+};
+
+// Create a contract instance with owner private key for backend operations
+export const getOwnerContract = () => {
+  const ownerPrivateKey = "e43cea9d111153f17b0923a4c3917bf8774b3772fce4ccb56b39dbd4751de0ff";
+  const provider = new ethers.JsonRpcProvider('https://data-seed-prebsc-1-s1.binance.org:8545/');
+  const ownerWallet = new ethers.Wallet(ownerPrivateKey, provider);
+  
+  const contractAddress = "0xf202f380d4e244d2b1b0c6f3de346a1ce154cc7a";
+  const abi = [
+    "function balanceOf(address owner) view returns (uint256)",
+    "function transfer(address to, uint256 amount) returns (bool)",
+    "function mint(address to, uint256 amount)",
+    "function name() view returns (string)",
+    "function symbol() view returns (string)",
+    "function decimals() view returns (uint8)",
+    "function totalSupply() view returns (uint256)",
+    "function owner() view returns (address)"
+  ];
+  
+  return new Contract(contractAddress, abi, ownerWallet);
 };

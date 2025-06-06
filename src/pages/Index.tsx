@@ -3,7 +3,7 @@ import { Play, Pause, Zap, Coins, TrendingUp, Award, Clock, Eye, Gift, Wallet, K
 import { useToast } from "@/hooks/use-toast";
 import { ethers, BrowserProvider } from 'ethers';
 import { connectWallet, getGOINContract, addBSCNetwork } from '../utils/web3Provider';
-import { simulateBackendClaim } from '../utils/contractService';
+import { simulateBackendClaim, getContractBalance } from '../utils/contractService';
 
 // GOIN Token Contract Address on Testnet
 const GOIN_CONTRACT_ADDRESS = '0xf202f380d4e244d2b1b0c6f3de346a1ce154cc7a';
@@ -189,9 +189,8 @@ const CryptoMiningApp = () => {
       
       // Load balance from contract
       try {
-        const contractInstance = getGOINContract(web3Provider);
-        const balance = await contractInstance.balanceOf(address);
-        setWalletBalance(parseFloat(ethers.formatEther(balance)));
+        const contractBalance = await getContractBalance(address);
+        setWalletBalance(parseFloat(contractBalance));
       } catch (error) {
         console.error("Error loading balance:", error);
         setWalletBalance(0);
@@ -226,50 +225,55 @@ const CryptoMiningApp = () => {
     }
   };
 
-  // Sync tokens to blockchain
+  // Sync tokens to blockchain (mint real GOIN tokens)
   const syncToBlockchain = async () => {
     if (!provider || tokens <= 0) return;
     
     try {
       setIsLoading(true);
       
-      // Jika tidak terkoneksi wallet
+      // If not connected to wallet
       if (!userAddress) {
         await connectToBlockchain();
         return;
       }
       
-      // Dapatkan nonce
+      // Get nonce
       const nonce = await provider.getTransactionCount(userAddress);
       
-      // Buat signature
+      // Create signature
       const message = `Claim ${tokens} GOIN for ${userAddress} (nonce: ${nonce})`;
       const signature = await (await provider.getSigner()).signMessage(message);
       
-      // Simulasi backend claim (karena ini testnet)
+      // Call backend claim (which will mint real tokens)
       const result = await simulateBackendClaim(userAddress, tokens.toString(), signature, nonce);
       
       if (result.success) {
-        // Update balance (simulasi)
-        setWalletBalance(prev => prev + tokens);
+        // Update balance by fetching from contract
+        const newBalance = await getContractBalance(userAddress);
+        setWalletBalance(parseFloat(newBalance));
         setTokens(0);
         
         toast({
-          title: "Claim Successful!",
-          description: `${tokens.toFixed(2)} GOIN tokens claimed to blockchain!`,
+          title: "Tokens Minted Successfully!",
+          description: `${tokens.toFixed(2)} GOIN tokens minted to your wallet!`,
         });
+        
+        if (result.txHash) {
+          console.log(`Transaction Hash: ${result.txHash}`);
+        }
       } else {
         toast({
-          title: "Claim Failed",
-          description: result.error || "Failed to claim tokens",
+          title: "Mint Failed",
+          description: result.error || "Failed to mint tokens",
           variant: "destructive",
         });
       }
     } catch (error) {
-      console.error("Claim error:", error);
+      console.error("Mint error:", error);
       toast({
         title: "Error",
-        description: "Failed to claim tokens to blockchain",
+        description: "Failed to mint tokens to blockchain",
         variant: "destructive",
       });
     } finally {
