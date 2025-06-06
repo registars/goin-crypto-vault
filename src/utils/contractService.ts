@@ -5,7 +5,7 @@ import { getGOINContract } from './web3Provider';
 export const verifySignature = (address: string, amount: string, signature: string, nonce: number): boolean => {
   try {
     const message = `Claim ${amount} GOIN for ${address} (nonce: ${nonce})`;
-    const recoveredAddress = ethers.utils.verifyMessage(message, signature);
+    const recoveredAddress = ethers.verifyMessage(message, signature);
     return recoveredAddress.toLowerCase() === address.toLowerCase();
   } catch (error) {
     console.error('Signature verification error:', error);

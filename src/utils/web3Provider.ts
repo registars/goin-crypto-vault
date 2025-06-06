@@ -1,26 +1,17 @@
 
-import { ethers } from 'ethers';
-import WalletConnectProvider from "@walletconnect/web3-provider";
+import { ethers, BrowserProvider, Contract } from 'ethers';
 
 export const connectWallet = async () => {
   // Metamask/TrustWallet
   if (window.ethereum) {
     await window.ethereum.request({ method: 'eth_requestAccounts' });
-    return new ethers.providers.Web3Provider(window.ethereum);
+    return new BrowserProvider(window.ethereum);
   }
   
-  // WalletConnect
-  const provider = new WalletConnectProvider({
-    rpc: {
-      56: "https://bsc-dataseed.binance.org/",
-      97: "https://data-seed-prebsc-1-s1.binance.org:8545/", // BSC Testnet
-    },
-  });
-  await provider.enable();
-  return new ethers.providers.Web3Provider(provider);
+  throw new Error('No wallet found. Please install MetaMask or another Web3 wallet.');
 };
 
-export const getGOINContract = (provider: ethers.providers.Web3Provider) => {
+export const getGOINContract = (provider: BrowserProvider) => {
   const contractAddress = "0xf202f380d4e244d2b1b0c6f3de346a1ce154cc7a"; // Alamat kontrak GOIN
   const abi = [
     // Standard BEP20 ABI + fungsi tambahan
@@ -32,12 +23,12 @@ export const getGOINContract = (provider: ethers.providers.Web3Provider) => {
     "function decimals() view returns (uint8)",
     "function totalSupply() view returns (uint256)"
   ];
-  return new ethers.Contract(contractAddress, abi, provider.getSigner());
+  return new Contract(contractAddress, abi, provider);
 };
 
 export const addBSCNetwork = async () => {
   try {
-    await window.ethereum.request({
+    await window.ethereum?.request({
       method: 'wallet_addEthereumChain',
       params: [{
         chainId: '0x61', // BSC Testnet

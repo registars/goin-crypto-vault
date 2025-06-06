@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Play, Pause, Zap, Coins, TrendingUp, Award, Clock, Eye, Gift, Wallet, Key, Download, Upload, Copy, Shield, RefreshCw, Send, Users, Trophy, Link, Star } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
-import { ethers } from 'ethers';
+import { ethers, BrowserProvider } from 'ethers';
 import { connectWallet, getGOINContract, addBSCNetwork } from '../utils/web3Provider';
 import { simulateBackendClaim } from '../utils/contractService';
 
@@ -29,7 +29,7 @@ const CryptoMiningApp = () => {
   const [achievements, setAchievements] = useState([]);
 
   // Web3 state variables
-  const [provider, setProvider] = useState(null);
+  const [provider, setProvider] = useState<BrowserProvider | null>(null);
   const [contract, setContract] = useState(null);
   const [userAddress, setUserAddress] = useState('');
   const [isConnectedToBlockchain, setIsConnectedToBlockchain] = useState(false);
@@ -54,7 +54,7 @@ const CryptoMiningApp = () => {
       const newWallet = {
         address: randomWallet.address,
         privateKey: randomWallet.privateKey,
-        mnemonic: randomWallet.mnemonic.phrase,
+        mnemonic: randomWallet.mnemonic?.phrase || '',
         network: 'BSC Testnet',
         contractAddress: GOIN_CONTRACT_ADDRESS,
         created: new Date().toISOString()
@@ -179,7 +179,7 @@ const CryptoMiningApp = () => {
       await addBSCNetwork();
       
       const web3Provider = await connectWallet();
-      const signer = web3Provider.getSigner();
+      const signer = await web3Provider.getSigner();
       const address = await signer.getAddress();
       
       setProvider(web3Provider);
@@ -189,8 +189,9 @@ const CryptoMiningApp = () => {
       
       // Load balance from contract
       try {
-        const balance = await getGOINContract(web3Provider).balanceOf(address);
-        setWalletBalance(parseFloat(ethers.utils.formatEther(balance)));
+        const contractInstance = getGOINContract(web3Provider);
+        const balance = await contractInstance.balanceOf(address);
+        setWalletBalance(parseFloat(ethers.formatEther(balance)));
       } catch (error) {
         console.error("Error loading balance:", error);
         setWalletBalance(0);
@@ -243,7 +244,7 @@ const CryptoMiningApp = () => {
       
       // Buat signature
       const message = `Claim ${tokens} GOIN for ${userAddress} (nonce: ${nonce})`;
-      const signature = await provider.getSigner().signMessage(message);
+      const signature = await (await provider.getSigner()).signMessage(message);
       
       // Simulasi backend claim (karena ini testnet)
       const result = await simulateBackendClaim(userAddress, tokens.toString(), signature, nonce);
