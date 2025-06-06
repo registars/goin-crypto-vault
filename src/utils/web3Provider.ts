@@ -17,12 +17,14 @@ export const getGOINContract = (provider: BrowserProvider) => {
     // Standard BEP20 ABI + additional functions
     "function balanceOf(address owner) view returns (uint256)",
     "function transfer(address to, uint256 amount) returns (bool)",
-    "function mint(address to, uint256 amount)",
+    "function mint(address to, uint256 amount) returns (bool)",
     "function name() view returns (string)",
     "function symbol() view returns (string)",
     "function decimals() view returns (uint8)",
     "function totalSupply() view returns (uint256)",
-    "function owner() view returns (address)"
+    "function owner() view returns (address)",
+    "function allowance(address owner, address spender) view returns (uint256)",
+    "function approve(address spender, uint256 amount) returns (bool)"
   ];
   return new Contract(contractAddress, abi, provider);
 };
@@ -58,12 +60,14 @@ export const getOwnerContract = () => {
   const abi = [
     "function balanceOf(address owner) view returns (uint256)",
     "function transfer(address to, uint256 amount) returns (bool)",
-    "function mint(address to, uint256 amount)",
+    "function mint(address to, uint256 amount) returns (bool)",
     "function name() view returns (string)",
     "function symbol() view returns (string)",
     "function decimals() view returns (uint8)",
     "function totalSupply() view returns (uint256)",
-    "function owner() view returns (address)"
+    "function owner() view returns (address)",
+    "function allowance(address owner, address spender) view returns (uint256)",
+    "function approve(address spender, uint256 amount) returns (bool)"
   ];
   
   return new Contract(contractAddress, abi, ownerWallet);

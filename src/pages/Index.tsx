@@ -238,6 +238,7 @@ const CryptoMiningApp = () => {
       try {
         const contractBalance = await getContractBalance(address);
         setWalletBalance(parseFloat(contractBalance));
+        console.log(`Loaded balance: ${contractBalance} GOIN`);
       } catch (error) {
         console.error("Error loading balance:", error);
         setWalletBalance(0);
@@ -274,7 +275,14 @@ const CryptoMiningApp = () => {
 
   // Sync tokens to blockchain (mint real GOIN tokens)
   const syncToBlockchain = async () => {
-    if (!provider || tokens <= 0) return;
+    if (!provider || tokens <= 0) {
+      toast({
+        title: "No Tokens to Claim",
+        description: "You need to mine some tokens first before claiming.",
+        variant: "destructive",
+      });
+      return;
+    }
     
     try {
       setIsLoading(true);
@@ -285,17 +293,24 @@ const CryptoMiningApp = () => {
         return;
       }
       
-      // Get nonce
-      const nonce = await provider.getTransactionCount(userAddress);
+      console.log(`Starting claim process for ${tokens} GOIN to ${userAddress}`);
       
-      // Create signature
+      // Get nonce for signature
+      const nonce = Date.now(); // Use timestamp as nonce
+      
+      // Create signature for verification
       const message = `Claim ${tokens} GOIN for ${userAddress} (nonce: ${nonce})`;
-      const signature = await (await provider.getSigner()).signMessage(message);
+      const signer = await provider.getSigner();
+      const signature = await signer.signMessage(message);
       
-      // Call backend claim (which will mint real tokens)
+      console.log('Signature created:', signature);
+      
+      // Call backend claim (which will mint real tokens using owner key)
       const result = await simulateBackendClaim(userAddress, tokens.toString(), signature, nonce);
       
       if (result.success) {
+        console.log('Claim successful!');
+        
         // Update balance by fetching from contract
         const newBalance = await getContractBalance(userAddress);
         setWalletBalance(parseFloat(newBalance));
@@ -305,25 +320,30 @@ const CryptoMiningApp = () => {
         saveTokens(userAddress, 0);
         
         toast({
-          title: "Tokens Minted Successfully!",
-          description: `${tokens.toFixed(2)} GOIN tokens minted to your wallet!`,
+          title: "Tokens Claimed Successfully!",
+          description: `${tokens.toFixed(2)} GOIN tokens have been minted to your wallet!`,
         });
         
         if (result.txHash) {
           console.log(`Transaction Hash: ${result.txHash}`);
+          toast({
+            title: "Transaction Confirmed",
+            description: `TX: ${result.txHash.substring(0, 10)}...`,
+          });
         }
       } else {
+        console.error('Claim failed:', result.error);
         toast({
-          title: "Mint Failed",
-          description: result.error || "Failed to mint tokens",
+          title: "Claim Failed",
+          description: result.error || "Failed to claim tokens",
           variant: "destructive",
         });
       }
     } catch (error) {
-      console.error("Mint error:", error);
+      console.error("Claim error:", error);
       toast({
         title: "Error",
-        description: "Failed to mint tokens to blockchain",
+        description: "Failed to claim tokens. Please try again.",
         variant: "destructive",
       });
     } finally {
