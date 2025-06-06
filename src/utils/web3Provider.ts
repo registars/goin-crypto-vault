@@ -1,40 +1,51 @@
-
 import { ethers, BrowserProvider, Contract } from 'ethers';
 
+// Konfigurasi jaringan dan kontrak
+export const CONTRACT_ADDRESS = "0xf202f380d4e244d2b1b0c6f3de346a1ce154cc7a";
+export const CONTRACT_OWNER = "0x4f0412CC1Ea121e553c9cC49B66affA2Ec9F9380";
+export const BSC_TESTNET_CHAIN_ID = "0x61";
+
+// ABI Kontrak (sederhana)
+export const GOIN_ABI = [
+  "function balanceOf(address owner) view returns (uint256)",
+  "function transfer(address to, uint256 amount) returns (bool)",
+  "function mint(address to, uint256 amount) returns (bool)",
+  "function name() view returns (string)",
+  "function symbol() view returns (string)"
+];
+
+// Fungsi untuk koneksi wallet
 export const connectWallet = async () => {
-  // Metamask/TrustWallet
-  if (window.ethereum) {
-    await window.ethereum.request({ method: 'eth_requestAccounts' });
-    return new BrowserProvider(window.ethereum);
+  if (!window.ethereum) {
+    throw new Error('No wallet found. Please install MetaMask or another Web3 wallet.');
   }
   
-  throw new Error('No wallet found. Please install MetaMask or another Web3 wallet.');
+  const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+  return new BrowserProvider(window.ethereum);
 };
 
+// Fungsi untuk mendapatkan instance kontrak
 export const getGOINContract = (provider: BrowserProvider) => {
-  const contractAddress = "0xf202f380d4e244d2b1b0c6f3de346a1ce154cc7a"; // GOIN contract address
-  const abi = [
-    // Standard BEP20 ABI + additional functions
-    "function balanceOf(address owner) view returns (uint256)",
-    "function transfer(address to, uint256 amount) returns (bool)",
-    "function mint(address to, uint256 amount) returns (bool)",
-    "function name() view returns (string)",
-    "function symbol() view returns (string)",
-    "function decimals() view returns (uint8)",
-    "function totalSupply() view returns (uint256)",
-    "function owner() view returns (address)",
-    "function allowance(address owner, address spender) view returns (uint256)",
-    "function approve(address spender, uint256 amount) returns (bool)"
-  ];
-  return new Contract(contractAddress, abi, provider);
+  return new Contract(CONTRACT_ADDRESS, GOIN_ABI, provider);
 };
 
+// Fungsi untuk memeriksa jaringan
+export const checkNetwork = async () => {
+  const provider = new BrowserProvider(window.ethereum);
+  const network = await provider.getNetwork();
+  
+  if (network.chainId !== BigInt(parseInt(BSC_TESTNET_CHAIN_ID, 16))) {
+    throw new Error("Please connect to BSC Testnet");
+  }
+};
+
+// Fungsi untuk menambahkan BSC Testnet ke wallet
 export const addBSCNetwork = async () => {
   try {
-    await window.ethereum?.request({
+    await window.ethereum.request({
       method: 'wallet_addEthereumChain',
       params: [{
-        chainId: '0x61', // BSC Testnet
+        chainId: BSC_TESTNET_CHAIN_ID,
         chainName: 'BSC Testnet',
         nativeCurrency: {
           name: 'BNB',
@@ -45,30 +56,33 @@ export const addBSCNetwork = async () => {
         blockExplorerUrls: ['https://testnet.bscscan.com/']
       }]
     });
+    return true;
   } catch (error) {
     console.error("Error adding BSC network:", error);
+    return false;
   }
 };
 
-// Create a contract instance with owner private key for backend operations
-export const getOwnerContract = () => {
-  const ownerPrivateKey = "e43cea9d111153f17b0923a4c3917bf8774b3772fce4ccb56b39dbd4751de0ff";
-  const provider = new ethers.JsonRpcProvider('https://data-seed-prebsc-1-s1.binance.org:8545/');
-  const ownerWallet = new ethers.Wallet(ownerPrivateKey, provider);
-  
-  const contractAddress = "0xf202f380d4e244d2b1b0c6f3de346a1ce154cc7a";
-  const abi = [
-    "function balanceOf(address owner) view returns (uint256)",
-    "function transfer(address to, uint256 amount) returns (bool)",
-    "function mint(address to, uint256 amount) returns (bool)",
-    "function name() view returns (string)",
-    "function symbol() view returns (string)",
-    "function decimals() view returns (uint8)",
-    "function totalSupply() view returns (uint256)",
-    "function owner() view returns (address)",
-    "function allowance(address owner, address spender) view returns (uint256)",
-    "function approve(address spender, uint256 amount) returns (bool)"
-  ];
-  
-  return new Contract(contractAddress, abi, ownerWallet);
+// Fungsi untuk mint token (frontend)
+export const mintTokens = async (provider: BrowserProvider, toAddress: string, amount: string) => {
+  try {
+    await checkNetwork();
+    
+    const signer = await provider.getSigner();
+    const contract = getGOINContract(provider).connect(signer);
+    
+    if (!ethers.isAddress(toAddress)) {
+      throw new Error("Invalid recipient address");
+    }
+
+    // Estimasi gas dengan buffer 20%
+    const estimatedGas = await contract.mint.estimateGas(toAddress, amount);
+    const gasLimit = estimatedGas * 120n / 100n;
+    
+    const tx = await contract.mint(toAddress, amount, { gasLimit });
+    return await tx.wait();
+  } catch (error) {
+    console.error("Minting error:", error);
+    throw new Error(`Minting failed: ${error.reason || error.message}`);
+  }
 };
