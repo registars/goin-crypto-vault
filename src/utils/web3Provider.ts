@@ -307,7 +307,7 @@ export const transferTokens = async (provider: BrowserProvider, toAddress: strin
     await checkNetwork();
     
     const signer = await provider.getSigner();
-    const contract = getGOINContract(provider).connect(signer);
+    const contract = getGOINContract(provider).connect(signer) as any;
     
     if (!ethers.isAddress(toAddress)) {
       throw new Error("Invalid recipient address");
@@ -322,7 +322,7 @@ export const transferTokens = async (provider: BrowserProvider, toAddress: strin
     
     const tx = await contract.transfer(toAddress, amountInWei, { gasLimit });
     return await tx.wait();
-  } catch (error) {
+  } catch (error: any) {
     console.error("Transfer error:", error);
     throw new Error(`Transfer failed: ${error.reason || error.message}`);
   }
