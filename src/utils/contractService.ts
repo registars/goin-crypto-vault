@@ -31,9 +31,18 @@ export const verifySignature = (address: string, amount: string, signature: stri
   }
 };
 
-// Since this is a standard ERC20 token without mint function, we'll simulate the claim process
+// Enhanced transfer function with better error handling
 export const transferTokensToAddress = async (address: string, amount: string): Promise<{ success: boolean; txHash?: string; error?: string }> => {
   try {
+    // Check if owner private key is configured
+    const ownerPrivateKey = import.meta.env.VITE_OWNER_PRIVATE_KEY;
+    if (!ownerPrivateKey) {
+      return { 
+        success: false, 
+        error: 'Backend service not configured. Owner private key missing. Please use direct wallet transfer instead.' 
+      };
+    }
+
     const contract = getOwnerContract();
     
     // Convert amount to Wei (18 decimals for GOIN token)
@@ -46,14 +55,14 @@ export const transferTokensToAddress = async (address: string, amount: string): 
     const ownerWallet = contract.runner as ethers.Wallet;
     const ownerAddress = ownerWallet.address;
     
-    // Check owner wallet balance
+    // Check owner wallet BNB balance
     const balance = await provider.getBalance(ownerAddress);
-    console.log(`Owner wallet balance: ${ethers.formatEther(balance)} BNB`);
+    console.log(`Owner wallet BNB balance: ${ethers.formatEther(balance)} BNB`);
     
-    if (balance < ethers.parseEther("0.002")) {
+    if (balance < ethers.parseEther("0.001")) {
       return { 
         success: false, 
-        error: 'Insufficient BNB balance for gas fees in owner wallet. Need at least 0.002 BNB.' 
+        error: 'Insufficient BNB balance for gas fees in owner wallet. Need at least 0.001 BNB.' 
       };
     }
     
@@ -64,11 +73,11 @@ export const transferTokensToAddress = async (address: string, amount: string): 
     if (tokenBalance < amountInWei) {
       return {
         success: false,
-        error: 'Insufficient GOIN tokens in owner wallet for transfer.'
+        error: `Insufficient GOIN tokens in owner wallet. Owner has ${ethers.formatEther(tokenBalance)} GOIN, need ${amount} GOIN.`
       };
     }
     
-    // Get current gas price with multiplier for faster confirmation
+    // Get current gas price
     const feeData = await provider.getFeeData();
     const gasPrice = feeData.gasPrice ? feeData.gasPrice * BigInt(110) / BigInt(100) : undefined;
     
@@ -81,13 +90,13 @@ export const transferTokensToAddress = async (address: string, amount: string): 
       console.error('Gas estimation failed:', estimateError);
       return { 
         success: false, 
-        error: 'Failed to estimate gas. Contract may reject the transaction.' 
+        error: `Failed to estimate gas: ${estimateError.reason || estimateError.message}` 
       };
     }
     
-    // Execute transfer transaction with optimized gas settings
+    // Execute transfer transaction
     const txOptions: any = {
-      gasLimit: gasEstimate * BigInt(130) / BigInt(100), // Add 30% buffer
+      gasLimit: gasEstimate * BigInt(120) / BigInt(100), // Add 20% buffer
     };
     
     if (gasPrice) {
@@ -99,13 +108,8 @@ export const transferTokensToAddress = async (address: string, amount: string): 
     const tx = await contract.transfer(address, amountInWei, txOptions);
     console.log(`Transaction sent: ${tx.hash}`);
     
-    // Wait for transaction confirmation with timeout
-    const receipt = await Promise.race([
-      tx.wait(),
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Transaction timeout')), 60000)
-      )
-    ]) as any;
+    // Wait for transaction confirmation
+    const receipt = await tx.wait();
     
     console.log(`Transaction confirmed in block: ${receipt.blockNumber}`);
     console.log(`Gas used: ${receipt.gasUsed.toString()}`);
@@ -121,15 +125,17 @@ export const transferTokensToAddress = async (address: string, amount: string): 
     let errorMessage = 'Failed to transfer tokens';
     
     if (error.message.includes('insufficient funds')) {
-      errorMessage = 'Insufficient BNB for gas fees. Please add more BNB to owner wallet.';
+      errorMessage = 'Insufficient BNB for gas fees in owner wallet.';
     } else if (error.message.includes('execution reverted')) {
-      errorMessage = 'Transaction reverted. The contract rejected the transfer request.';
+      errorMessage = 'Transaction rejected by contract. Check token balance and permissions.';
     } else if (error.message.includes('nonce too low')) {
       errorMessage = 'Transaction nonce error. Please try again.';
     } else if (error.message.includes('gas required exceeds allowance')) {
       errorMessage = 'Gas limit too low. Please try again.';
-    } else if (error.message.includes('Transaction timeout')) {
-      errorMessage = 'Transaction is taking too long. Please check BSC testnet status.';
+    } else if (error.reason) {
+      errorMessage = `Contract error: ${error.reason}`;
+    } else {
+      errorMessage = error.message;
     }
     
     return { 
@@ -139,6 +145,7 @@ export const transferTokensToAddress = async (address: string, amount: string): 
   }
 };
 
+// Enhanced claim function with fallback
 export const simulateBackendClaim = async (address: string, amount: string, signature: string, nonce: number): Promise<{ success: boolean; txHash?: string; error?: string }> => {
   console.log('Starting backend claim simulation...');
   
@@ -152,7 +159,7 @@ export const simulateBackendClaim = async (address: string, amount: string, sign
   
   console.log('Signature validated successfully');
   
-  // Check network status before proceeding
+  // Check network status
   try {
     const network = await provider.getNetwork();
     console.log('Connected to network:', network.name, 'Chain ID:', network.chainId);
