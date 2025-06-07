@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { connectWallet, getGOINContract, addBSCNetwork, getOwnerContract } from '@/utils/web3Provider';
+import { connectWallet, getGOINContract, addBSCNetwork, CONTRACT_ADDRESS } from '@/utils/web3Provider';
 import { simulateBackendClaim, getContractBalance, getContractInfo } from '@/utils/contractService';
 import { saveTokens, loadTokens, saveMiningState, loadMiningState } from '@/utils/localStorage';
 import { BrowserProvider } from 'ethers';
@@ -31,7 +31,7 @@ import {
 } from 'lucide-react';
 
 // Constants
-const GOIN_CONTRACT_ADDRESS = "0xf202f380d4e244d2b1b0c6f3de346a1ce154cc7a";
+const GOIN_CONTRACT_ADDRESS = CONTRACT_ADDRESS;
 
 const Index = () => {
   const [isMining, setIsMining] = useState(false);
@@ -317,7 +317,7 @@ const Index = () => {
     }
   };
 
-  // Sync tokens to blockchain (mint real GOIN tokens)
+  // Sync tokens to blockchain (claim real GOIN tokens)
   const syncToBlockchain = async () => {
     if (!provider || tokens <= 0) {
       toast({
@@ -349,7 +349,7 @@ const Index = () => {
       
       console.log('Signature created:', signature);
       
-      // Call backend claim (which will mint real tokens using owner key)
+      // Call backend claim (which will transfer real tokens using owner key)
       const result = await simulateBackendClaim(userAddress, tokens.toString(), signature, nonce);
       
       if (result.success) {
@@ -365,7 +365,7 @@ const Index = () => {
         
         toast({
           title: "Tokens Claimed Successfully!",
-          description: `${tokens.toFixed(2)} GOIN tokens have been minted to your wallet!`,
+          description: `${tokens.toFixed(2)} GOIN tokens have been transferred to your wallet!`,
         });
         
         if (result.txHash) {
@@ -673,6 +673,13 @@ const Index = () => {
                   </div>
                 </div>
               )}
+
+              {/* Token Balance Display */}
+              <div className="bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-2xl p-6 border border-blue-500/30 text-center">
+                <div className="text-sm text-blue-300 mb-2">Mined Tokens</div>
+                <div className="text-4xl font-bold text-white mb-2">{tokens.toFixed(2)} GOIN</div>
+                <div className="text-xs text-blue-200">Level {level} • {experience % (level * 100)}/{level * 100} XP</div>
+              </div>
 
               {/* Goat Mining Animation - positioned above mining controls */}
               <Card className="w-full">

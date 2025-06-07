@@ -10,7 +10,7 @@ const provider = new ethers.JsonRpcProvider(BSC_TESTNET_RPC, {
 });
 
 export const getOwnerContract = () => {
-  const ownerPrivateKey = import.meta.env.VITE_OWNER_PRIVATE_KEY || process.env.OWNER_PRIVATE_KEY;
+  const ownerPrivateKey = import.meta.env.VITE_OWNER_PRIVATE_KEY;
   if (!ownerPrivateKey) {
     console.error('Owner private key not configured');
     throw new Error('Owner private key not configured in environment variables');
@@ -31,14 +31,15 @@ export const verifySignature = (address: string, amount: string, signature: stri
   }
 };
 
-export const mintTokensToAddress = async (address: string, amount: string): Promise<{ success: boolean; txHash?: string; error?: string }> => {
+// Since this is a standard ERC20 token without mint function, we'll simulate the claim process
+export const transferTokensToAddress = async (address: string, amount: string): Promise<{ success: boolean; txHash?: string; error?: string }> => {
   try {
     const contract = getOwnerContract();
     
     // Convert amount to Wei (18 decimals for GOIN token)
     const amountInWei = ethers.parseEther(amount);
     
-    console.log(`Attempting to mint ${amount} GOIN to ${address}`);
+    console.log(`Attempting to transfer ${amount} GOIN to ${address}`);
     console.log(`Amount in Wei: ${amountInWei.toString()}`);
     
     // Get owner wallet properly
@@ -56,33 +57,35 @@ export const mintTokensToAddress = async (address: string, amount: string): Prom
       };
     }
     
+    // Check GOIN token balance of owner
+    const tokenBalance = await contract.balanceOf(ownerAddress);
+    console.log(`Owner GOIN balance: ${ethers.formatEther(tokenBalance)} GOIN`);
+    
+    if (tokenBalance < amountInWei) {
+      return {
+        success: false,
+        error: 'Insufficient GOIN tokens in owner wallet for transfer.'
+      };
+    }
+    
     // Get current gas price with multiplier for faster confirmation
     const feeData = await provider.getFeeData();
     const gasPrice = feeData.gasPrice ? feeData.gasPrice * BigInt(110) / BigInt(100) : undefined;
     
-    // Estimate gas for the mint transaction
+    // Estimate gas for the transfer transaction
     let gasEstimate;
     try {
-      gasEstimate = await contract.mint.estimateGas(address, amountInWei);
+      gasEstimate = await contract.transfer.estimateGas(address, amountInWei);
       console.log(`Estimated gas: ${gasEstimate.toString()}`);
     } catch (estimateError: any) {
       console.error('Gas estimation failed:', estimateError);
-      
-      // More specific error handling
-      if (estimateError.message.includes('Ownable: caller is not the owner')) {
-        return { 
-          success: false, 
-          error: 'Minting failed: Only contract owner can mint tokens. Please contact administrator.' 
-        };
-      }
-      
       return { 
         success: false, 
         error: 'Failed to estimate gas. Contract may reject the transaction.' 
       };
     }
     
-    // Execute mint transaction with optimized gas settings
+    // Execute transfer transaction with optimized gas settings
     const txOptions: any = {
       gasLimit: gasEstimate * BigInt(130) / BigInt(100), // Add 30% buffer
     };
@@ -93,7 +96,7 @@ export const mintTokensToAddress = async (address: string, amount: string): Prom
     
     console.log('Transaction options:', txOptions);
     
-    const tx = await contract.mint(address, amountInWei, txOptions);
+    const tx = await contract.transfer(address, amountInWei, txOptions);
     console.log(`Transaction sent: ${tx.hash}`);
     
     // Wait for transaction confirmation with timeout
@@ -112,17 +115,15 @@ export const mintTokensToAddress = async (address: string, amount: string): Prom
       txHash: tx.hash 
     };
   } catch (error: any) {
-    console.error('Minting error:', error);
+    console.error('Transfer error:', error);
     
     // Enhanced error messages
-    let errorMessage = 'Failed to mint tokens';
+    let errorMessage = 'Failed to transfer tokens';
     
-    if (error.message.includes('Ownable: caller is not the owner')) {
-      errorMessage = 'Only the contract owner can mint tokens. Please contact administrator.';
-    } else if (error.message.includes('insufficient funds')) {
+    if (error.message.includes('insufficient funds')) {
       errorMessage = 'Insufficient BNB for gas fees. Please add more BNB to owner wallet.';
     } else if (error.message.includes('execution reverted')) {
-      errorMessage = 'Transaction reverted. The contract rejected the mint request.';
+      errorMessage = 'Transaction reverted. The contract rejected the transfer request.';
     } else if (error.message.includes('nonce too low')) {
       errorMessage = 'Transaction nonce error. Please try again.';
     } else if (error.message.includes('gas required exceeds allowance')) {
@@ -163,8 +164,8 @@ export const simulateBackendClaim = async (address: string, amount: string, sign
     return { success: false, error: 'Failed to connect to BSC Testnet. Please check your internet connection.' };
   }
   
-  // Try to mint tokens using owner contract
-  const result = await mintTokensToAddress(address, amount);
+  // Try to transfer tokens using owner contract
+  const result = await transferTokensToAddress(address, amount);
   
   return result;
 };
