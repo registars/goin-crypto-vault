@@ -1,4 +1,3 @@
-
 import { ethers } from 'ethers';
 import { CONTRACT_ADDRESS, GOIN_ABI, CONTRACT_OWNER } from './web3Provider';
 
@@ -33,6 +32,136 @@ export const verifySignature = (address: string, amount: string, signature: stri
   } catch (error) {
     console.error('Signature verification error:', error);
     return false;
+  }
+};
+
+// Validate MetaMask connection and network
+export const validateMetaMaskConnection = async (): Promise<{ valid: boolean; error?: string; address?: string }> => {
+  try {
+    if (!window.ethereum) {
+      return { valid: false, error: 'MetaMask not installed. Please install MetaMask to continue.' };
+    }
+
+    // Check if MetaMask is connected
+    const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+    if (accounts.length === 0) {
+      return { valid: false, error: 'MetaMask not connected. Please connect your wallet.' };
+    }
+
+    // Check network
+    const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+    if (chainId !== '0x61') { // BSC Testnet chain ID
+      return { valid: false, error: 'Please switch to BSC Testnet network in MetaMask.' };
+    }
+
+    return { valid: true, address: accounts[0] };
+  } catch (error) {
+    console.error('MetaMask validation error:', error);
+    return { valid: false, error: 'Error validating MetaMask connection.' };
+  }
+};
+
+// Real withdrawal function using MetaMask and smart contract
+export const withdrawTokensToMiner = async (
+  userProvider: any, 
+  toAddress: string, 
+  amount: string
+): Promise<{ success: boolean; txHash?: string; error?: string }> => {
+  try {
+    console.log(`Starting withdrawal: ${amount} GOIN to ${toAddress}`);
+
+    // Validate MetaMask connection
+    const validation = await validateMetaMaskConnection();
+    if (!validation.valid) {
+      return { success: false, error: validation.error };
+    }
+
+    // Validate addresses match
+    if (validation.address?.toLowerCase() !== toAddress.toLowerCase()) {
+      return { success: false, error: 'Connected wallet address does not match recipient address.' };
+    }
+
+    // Get signer from user's MetaMask
+    const signer = await userProvider.getSigner();
+    const contract = new ethers.Contract(CONTRACT_ADDRESS, GOIN_ABI, signer);
+
+    // Convert amount to Wei
+    const amountInWei = ethers.parseEther(amount);
+    
+    console.log(`Amount in Wei: ${amountInWei.toString()}`);
+
+    // Check user's GOIN balance
+    const userBalance = await contract.balanceOf(toAddress);
+    console.log(`User GOIN balance: ${ethers.formatEther(userBalance)} GOIN`);
+
+    if (userBalance < amountInWei) {
+      return {
+        success: false,
+        error: `Insufficient GOIN balance. You have ${ethers.formatEther(userBalance)} GOIN, trying to withdraw ${amount} GOIN.`
+      };
+    }
+
+    // Check BNB balance for gas
+    const bnbBalance = await userProvider.getBalance(toAddress);
+    if (bnbBalance < ethers.parseEther("0.001")) {
+      return {
+        success: false,
+        error: 'Insufficient BNB for gas fees. Need at least 0.001 BNB.'
+      };
+    }
+
+    // Estimate gas
+    let gasEstimate;
+    try {
+      gasEstimate = await contract.transfer.estimateGas(toAddress, amountInWei);
+      console.log(`Estimated gas: ${gasEstimate.toString()}`);
+    } catch (estimateError: any) {
+      console.error('Gas estimation failed:', estimateError);
+      return { 
+        success: false, 
+        error: `Failed to estimate gas: ${estimateError.reason || estimateError.message}` 
+      };
+    }
+
+    // Execute transfer
+    const txOptions = {
+      gasLimit: gasEstimate * BigInt(120) / BigInt(100), // Add 20% buffer
+    };
+
+    console.log('Executing withdrawal transaction...');
+    const tx = await contract.transfer(toAddress, amountInWei, txOptions);
+    console.log(`Transaction sent: ${tx.hash}`);
+
+    // Wait for confirmation
+    const receipt = await tx.wait();
+    console.log(`Transaction confirmed in block: ${receipt.blockNumber}`);
+
+    return {
+      success: true,
+      txHash: tx.hash
+    };
+
+  } catch (error: any) {
+    console.error('Withdrawal error:', error);
+    
+    let errorMessage = 'Withdrawal failed';
+    
+    if (error.message.includes('insufficient funds')) {
+      errorMessage = 'Insufficient BNB for gas fees.';
+    } else if (error.message.includes('execution reverted')) {
+      errorMessage = 'Transaction rejected by contract. Check your token balance.';
+    } else if (error.message.includes('user rejected')) {
+      errorMessage = 'Transaction rejected by user.';
+    } else if (error.reason) {
+      errorMessage = `Contract error: ${error.reason}`;
+    } else {
+      errorMessage = error.message;
+    }
+    
+    return {
+      success: false,
+      error: errorMessage
+    };
   }
 };
 

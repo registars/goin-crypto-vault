@@ -450,7 +450,8 @@ const Index = () => {
     }
   };
 
-  const handleWithdrawal = () => {
+  // Updated withdrawal function with real blockchain transfer
+  const handleWithdrawal = async () => {
     if (!wallet || !withdrawAmount) {
       toast({
         title: "Error",
@@ -461,6 +462,15 @@ const Index = () => {
     }
 
     const amount = parseFloat(withdrawAmount);
+    if (amount <= 0) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid amount",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (amount > walletBalance) {
       toast({
         title: "Error",
@@ -470,18 +480,61 @@ const Index = () => {
       return;
     }
 
-    // Simulate withdrawal process
-    setIsLoading(true);
-    setTimeout(() => {
-      setWalletBalance(prev => prev - amount);
-      setWithdrawAmount('');
-      setShowWithdrawModal(false);
-      setIsLoading(false);
+    if (!provider || !isConnectedToBlockchain) {
       toast({
-        title: "Withdrawal Successful",
-        description: `${amount.toFixed(4)} GOIN withdrawn to your wallet`,
+        title: "Error",
+        description: "Please connect to MetaMask first",
+        variant: "destructive",
       });
-    }, 2000);
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      
+      console.log(`Attempting withdrawal: ${amount} GOIN to ${userAddress}`);
+      
+      // Use the real withdrawal function
+      const result = await withdrawTokensToMiner(provider, userAddress, amount.toString());
+      
+      if (result.success) {
+        // Update local balance after successful withdrawal
+        const newBalance = await getContractBalance(userAddress);
+        setWalletBalance(parseFloat(newBalance));
+        
+        setWithdrawAmount('');
+        setShowWithdrawModal(false);
+        
+        toast({
+          title: "Withdrawal Successful!",
+          description: `${amount.toFixed(4)} GOIN withdrawn successfully`,
+        });
+
+        if (result.txHash) {
+          console.log(`Transaction Hash: ${result.txHash}`);
+          toast({
+            title: "Transaction Confirmed",
+            description: `TX: ${result.txHash.substring(0, 10)}...`,
+          });
+        }
+      } else {
+        console.error('Withdrawal failed:', result.error);
+        toast({
+          title: "Withdrawal Failed",
+          description: result.error || "Failed to withdraw tokens",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Withdrawal error:", error);
+      toast({
+        title: "Error",
+        description: "Failed to process withdrawal. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const applyReferralCode = () => {
@@ -1274,30 +1327,65 @@ const Index = () => {
         {showWithdrawModal && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
             <div className="bg-gray-900 rounded-2xl p-6 w-full max-w-md border border-white/20">
-              <h3 className="text-xl font-bold mb-4">Withdraw GOIN</h3>
+              <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                <Send className="text-green-400" />
+                Withdraw GOIN Tokens
+              </h3>
               
               <div className="space-y-4">
+                {/* MetaMask Connection Status */}
+                <div className={`rounded-lg p-3 border ${
+                  isConnectedToBlockchain 
+                    ? 'bg-green-500/20 border-green-500/30' 
+                    : 'bg-red-500/20 border-red-500/30'
+                }`}>
+                  <div className={`text-sm flex items-center gap-2 ${
+                    isConnectedToBlockchain ? 'text-green-300' : 'text-red-300'
+                  }`}>
+                    <Wallet className="w-4 h-4" />
+                    {isConnectedToBlockchain 
+                      ? '✅ MetaMask Connected (BSC Testnet)'
+                      : '❌ MetaMask Not Connected'
+                    }
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-sm text-blue-300 mb-2">
-                    Amount to Withdraw
+                    Amount to Withdraw (GOIN)
                   </label>
                   <input
                     type="number"
                     value={withdrawAmount}
                     onChange={(e) => setWithdrawAmount(e.target.value)}
                     placeholder="0.0000"
+                    step="0.0001"
                     className="w-full p-3 bg-black/20 border border-white/20 rounded-lg text-white placeholder-gray-400"
                   />
                   <div className="text-xs text-gray-400 mt-1">
                     Available: {walletBalance.toFixed(4)} GOIN
                   </div>
                 </div>
-                
-                <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-lg p-3">
-                  <div className="text-sm text-yellow-300">
-                    ⚠️ Withdrawal will be processed to your connected wallet address.
+
+                <div className="bg-blue-500/20 border border-blue-500/30 rounded-lg p-3">
+                  <div className="text-sm text-blue-300 mb-2">
+                    📋 Withdrawal Process:
+                  </div>
+                  <div className="text-xs text-blue-200 space-y-1">
+                    <div>• Tokens will be transferred using smart contract</div>
+                    <div>• MetaMask will prompt for transaction approval</div>
+                    <div>• Small BNB amount needed for gas fees</div>
+                    <div>• Transaction will be recorded on BSC Testnet</div>
                   </div>
                 </div>
+
+                {!isConnectedToBlockchain && (
+                  <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-lg p-3">
+                    <div className="text-sm text-yellow-300">
+                      ⚠️ Please connect MetaMask first to enable real withdrawals.
+                    </div>
+                  </div>
+                )}
                 
                 <div className="flex gap-3">
                   <button
@@ -1308,7 +1396,7 @@ const Index = () => {
                   </button>
                   <button
                     onClick={handleWithdrawal}
-                    disabled={isLoading}
+                    disabled={isLoading || !isConnectedToBlockchain}
                     className="flex-1 bg-green-500 hover:bg-green-600 disabled:bg-gray-500 text-white py-3 rounded-xl font-semibold transition-all"
                   >
                     {isLoading ? 'Processing...' : 'Withdraw'}
