@@ -494,8 +494,12 @@ const Index = () => {
       
       console.log(`Attempting withdrawal: ${amount} GOIN to ${userAddress}`);
       
-      // Use the real withdrawal function
-      const result = await withdrawTokensToMiner(provider, userAddress, amount.toString());
+      interface IndexProps {
+  withdrawTokensToMiner: () => void; // Adjust the type as needed
+}
+
+const Index: React.FC<IndexProps> = ({ withdrawTokensToMiner }) => {
+
       
       if (result.success) {
         // Update local balance after successful withdrawal
