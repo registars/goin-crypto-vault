@@ -343,39 +343,32 @@ const Index = () => {
       const ownerPrivateKey = import.meta.env.VITE_OWNER_PRIVATE_KEY;
       
       if (!ownerPrivateKey) {
-        // Fallback: use direct wallet transfer instead of backend claim
-        console.log('Owner private key not configured, using direct wallet transfer');
+        // Fallback: simulate successful claim without actual blockchain transfer
+        console.log('Owner private key not configured, using local simulation');
         
-        const signer = await provider.getSigner();
-        const currentAddress = await signer.getAddress();
-        
-        if (currentAddress.toLowerCase() !== userAddress.toLowerCase()) {
-          toast({
-            title: "Error",
-            description: "Please ensure you're connected with the correct wallet",
-            variant: "destructive",
-          });
-          return;
+        // Get current balance and simulate the addition
+        try {
+          const currentBalance = await getContractBalance(userAddress);
+          const newBalance = parseFloat(currentBalance) + tokens;
+          setWalletBalance(newBalance);
+        } catch (error) {
+          // If we can't get balance, just add to current wallet balance
+          setWalletBalance(prev => prev + tokens);
         }
         
-        // Check if user's wallet has GOIN tokens to simulate the claim
-        const userBalance = await getContractBalance(userAddress);
-        const newBalance = parseFloat(userBalance) + tokens;
-        
-        // Simulate successful claim by updating balance
-        setWalletBalance(newBalance);
+        // Reset tokens
         setTokens(0);
         saveTokens(userAddress, 0);
         
         toast({
           title: "Tokens Claimed Successfully!",
-          description: `${tokens.toFixed(2)} GOIN tokens have been added to your balance!`,
+          description: `${tokens.toFixed(2)} GOIN tokens have been added to your balance! (Local simulation - owner key not configured)`,
         });
         
         return;
       }
       
-      // Normal backend claim process
+      // Normal backend claim process with owner private key
       const nonce = Date.now();
       const message = `Claim ${tokens} GOIN for ${userAddress} (nonce: ${nonce})`;
       const signer = await provider.getSigner();
@@ -412,24 +405,11 @@ const Index = () => {
       } else {
         console.error('Claim failed:', result.error);
         
-        // If backend claim fails but it's due to configuration, offer alternative
-        if (result.error?.includes('Backend service not configured')) {
-          toast({
-            title: "Using Alternative Claim Method",
-            description: "Tokens added to your local balance. Backend transfer not available.",
-          });
-          
-          // Update balance locally
-          setWalletBalance(prev => prev + tokens);
-          setTokens(0);
-          saveTokens(userAddress, 0);
-        } else {
-          toast({
-            title: "Claim Failed",
-            description: result.error || "Failed to claim tokens",
-            variant: "destructive",
-          });
-        }
+        toast({
+          title: "Claim Failed",
+          description: result.error || "Failed to claim tokens",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       console.error("Claim error:", error);

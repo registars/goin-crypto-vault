@@ -20,6 +20,11 @@ export const getOwnerContract = () => {
   return new ethers.Contract(CONTRACT_ADDRESS, GOIN_ABI, ownerWallet);
 };
 
+// Create a read-only contract instance for balance checking
+export const getReadOnlyContract = () => {
+  return new ethers.Contract(CONTRACT_ADDRESS, GOIN_ABI, provider);
+};
+
 export const verifySignature = (address: string, amount: string, signature: string, nonce: number): boolean => {
   try {
     const message = `Claim ${amount} GOIN for ${address} (nonce: ${nonce})`;
@@ -177,9 +182,10 @@ export const simulateBackendClaim = async (address: string, amount: string, sign
   return result;
 };
 
+// Updated getContractBalance to use read-only contract
 export const getContractBalance = async (address: string): Promise<string> => {
   try {
-    const contract = getOwnerContract();
+    const contract = getReadOnlyContract();
     const balance = await contract.balanceOf(address);
     return ethers.formatEther(balance);
   } catch (error) {
@@ -190,7 +196,7 @@ export const getContractBalance = async (address: string): Promise<string> => {
 
 export const getContractInfo = async (): Promise<{ name: string; symbol: string; decimals: number; totalSupply: string }> => {
   try {
-    const contract = getOwnerContract();
+    const contract = getReadOnlyContract();
     const [name, symbol, decimals, totalSupply] = await Promise.all([
       contract.name(),
       contract.symbol(),
