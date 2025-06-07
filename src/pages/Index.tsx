@@ -589,25 +589,15 @@ const Index = () => {
           <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">
             GOIN Miner
           </h1>
-          <p className="text-gray-600">Mine GOIN tokens from BSC Testnet smart contract</p>
+          <p className="text-gray-600">Mine MyGOIN tokens from BSC Testnet smart contract</p>
           {contractInfo.name && (
             <div className="flex justify-center space-x-4 text-sm">
               <Badge variant="outline">{contractInfo.name} ({contractInfo.symbol})</Badge>
               <Badge variant="outline">Supply: {parseFloat(contractInfo.totalSupply || '0').toFixed(2)}</Badge>
-              <Badge variant="outline">Testnet</Badge>
+              <Badge variant="outline">BSC Testnet</Badge>
             </div>
           )}
         </div>
-
-        {/* Mining Animation */}
-        <Card className="w-full">
-          <CardHeader>
-            <CardTitle className="text-center">Mining Status</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <GoatMiningAnimation isActive={isMining} />
-          </CardContent>
-        </Card>
 
         {/* Navigation Tabs */}
         <div className="max-w-md mx-auto px-4 py-4">
@@ -684,22 +674,16 @@ const Index = () => {
                 </div>
               )}
 
-              {/* Mining Status */}
+              {/* Goat Mining Animation - positioned above mining controls */}
+              <Card className="w-full">
+                <CardContent className="p-6">
+                  <GoatMiningAnimation isActive={isMining} />
+                </CardContent>
+              </Card>
+
+              {/* Mining Controls */}
               <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
                 <div className="text-center space-y-4">
-                  <div className="relative">
-                    <div className={`w-24 h-24 mx-auto rounded-full border-4 ${isMining ? 'border-green-400 animate-pulse' : 'border-gray-400'} flex items-center justify-center bg-gradient-to-br from-blue-500 to-purple-600`}>
-                      {isMining ? (
-                        <Zap className="w-8 h-8 text-yellow-300 animate-bounce" />
-                      ) : (
-                        <div className="w-8 h-8 text-gray-300">⏸</div>
-                      )}
-                    </div>
-                    {isMining && (
-                      <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-green-400 animate-spin"></div>
-                    )}
-                  </div>
-                  
                   <div>
                     <div className="text-2xl font-bold">{miningRate.toFixed(2)} GOIN/s</div>
                     <div className="text-sm text-blue-300">Mining Rate</div>
@@ -718,7 +702,7 @@ const Index = () => {
                 </div>
               </div>
 
-              {/* Enhanced Wallet Sync */}
+              {/* Enhanced Wallet Sync with better gas handling */}
               {wallet && (
                 <div className="bg-gradient-to-r from-green-500/20 to-blue-500/20 rounded-xl p-4 border border-green-500/30">
                   <div className="flex justify-between items-center">
@@ -735,6 +719,11 @@ const Index = () => {
                           : `Transfer ${tokens.toFixed(2)} GOIN to wallet`
                         }
                       </div>
+                      {tokens > 0 && (
+                        <div className="text-xs text-green-200 mt-1">
+                          ⛽ Gas optimized for BSC Testnet
+                        </div>
+                      )}
                     </div>
                     <button
                       onClick={syncWalletBalance}
